@@ -1,9 +1,6 @@
 #!/usr/bin/env bun
-
-import path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import readline from 'node:readline';
 import Bun from 'bun';
 
 // Promisify exec for async/await
@@ -37,9 +34,9 @@ async function copyToClipboard(text) {
 
 // Function to select files with fzf
 async function selectFilesWithFzf() {
-  const projectRoot = process.cwd(); // Use calling directory as root
+  const projectRoot = process.cwd();
   const findCommand = `find ${projectRoot} -type f -not -path '*/\.git/*' -not -path '*/node_modules/*'`;
-  const currentWorkingDirectory = process.cwd(); // Get current working directory
+  const currentWorkingDirectory = process.cwd();
   const fzfCommand = `${findCommand} | sed -E 's|^${currentWorkingDirectory}/||' | fzf --multi --height 40% --border --preview 'cat {}'`;
   try {
     const { stdout } = await execPromise(fzfCommand);
@@ -66,62 +63,162 @@ async function selectFilesWithFzf() {
   }
 }
 
+// Function to prompt user for input
+async function promptUser(message) {
+  return new Promise((resolve) => {
+    const readline = require('readline').createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    readline.question(message, (answer) => {
+      readline.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+// Function to prompt for a number within a range
+async function promptForNumber(message, min, max) {
+  while (true) {
+    const input = await promptUser(message);
+    const num = parseInt(input, 10);
+    if (!isNaN(num) && num >= min && num <= max) {
+      return num;
+    }
+    console.log(`Please enter a number between ${min} and ${max}.`);
+  }
+}
+
+// Function to display file content paginated (50 lines at a time)
+async function displayPaginated(file, lines, totalLines) {
+  const pageSize = 50;
+  let currentLine = 0;
+  let page = 1;
+  while (currentLine < totalLines) {
+    const endLine = Math.min(currentLine + pageSize, totalLines);
+    console.log(
+      `\n--- Page ${page}: lines ${currentLine + 1} to ${endLine} ---`,
+    );
+    for (let i = currentLine; i < endLine; i++) {
+      console.log(`${(i + 1).toString().padStart(4)} ${lines[i]}`);
+    }
+    currentLine = endLine;
+    page++;
+    if (currentLine < totalLines) {
+      const continueChoice = await promptUser(
+        'Press Enter to continue or "q" to stop viewing: ',
+      );
+      if (continueChoice.toLowerCase() === 'q') {
+        break;
+      }
+    }
+  }
+}
+
 // Main function to handle file selection and processing
 async function main() {
   // Select files with fzf
   const filePaths = await selectFilesWithFzf();
 
-  // Set up readline for user input
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
-
-  const projectRoot = process.cwd();
-
   // Build output with and without colors
   let outputWithColors = '\n**Results:**\n';
   let outputWithoutColors = '\n**Results:**\n';
   const separatorLine = '─'.repeat(50); // A horizontal line for separation
-  for (const [index, relativePath] of filePaths.entries()) {
-    try {
-      const content = await Bun.file(relativePath).text();
-      // Add separator before each file except the first one
-      if (index > 0) {
-        outputWithColors += `${colors.yellow}${separatorLine} Filepath: ${relativePath} ${separatorLine}${colors.reset}\n`;
-        outputWithoutColors += `${separatorLine} Filepath: ${relativePath} ${separatorLine}\n`;
+
+  for (const [index, file] of filePaths.entries()) {
+    console.log(`\nProcessing file: ${file}`);
+    let content = '';
+    let choice;
+
+    do {
+      choice = await promptUser(
+        'Include full file (f), select range (r), read paginated (p), or skip (s)? ',
+      );
+
+      if (choice.toLowerCase() === 'f') {
+        // Include entire file
+        try {
+          content = await Bun.file(file).text();
+        } catch (err) {
+          console.error(`Error reading file ${file}: ${err.message}`);
+          continue;
+        }
+      } else if (choice.toLowerCase() === 'r') {
+        // Select a range of lines
+        const viewChoice = await promptUser(
+          'View file paginated (p) or all at once (a)? ',
+        );
+        try {
+          const fileContent = await Bun.file(file).text();
+          const lines = fileContent.split('\n');
+          const totalLines = lines.length;
+          console.log(`\nFile: ${file} (${totalLines} lines)`);
+
+          if (viewChoice.toLowerCase() === 'p') {
+            await displayPaginated(file, lines, totalLines);
+          } else {
+            // Print all at once
+            lines.forEach((line, i) => {
+              console.log(`${(i + 1).toString().padStart(4)} ${line}`);
+            });
+          }
+
+          // Prompt for start and end lines
+          const startPrompt = 'Scroll up to view the file. Enter start line: ';
+          const start = await promptForNumber(startPrompt, 1, totalLines);
+          const endPrompt = 'Scroll up to view the file. Enter end line: ';
+          const end = await promptForNumber(endPrompt, start, totalLines);
+          content = lines.slice(start - 1, end).join('\n');
+        } catch (err) {
+          console.error(`Error reading file ${file}: ${err.message}`);
+          continue;
+        }
+      } else if (choice.toLowerCase() === 'p') {
+        // Read file paginated (new option)
+        try {
+          const fileContent = await Bun.file(file).text();
+          const lines = fileContent.split('\n');
+          const totalLines = lines.length;
+          console.log(`\nFile: ${file} (${totalLines} lines)`);
+          await displayPaginated(file, lines, totalLines);
+          console.log('Finished reading. Returning to options.');
+        } catch (err) {
+          console.error(`Error reading file ${file}: ${err.message}`);
+          continue;
+        }
+      } else if (choice.toLowerCase() === 's') {
+        console.log('Skipping this file.');
       } else {
-        // For the first file, no separator above, just label it
-        outputWithColors += `${colors.yellow}Filepath: ${relativePath}${colors.reset}\n`;
-        outputWithoutColors += `Filepath: ${relativePath}\n`;
+        console.log('Invalid choice. Please enter f, r, p, or s.');
+      }
+    } while (choice.toLowerCase() === 'p'); // Loop if reading paginated, to allow further actions
+
+    if (choice.toLowerCase() === 's') {
+      continue;
+    }
+
+    // Add content to output if there is any
+    if (content) {
+      if (index > 0) {
+        outputWithColors += `${colors.yellow}${separatorLine} Filepath: ${file} ${separatorLine}${colors.reset}\n`;
+        outputWithoutColors += `${separatorLine} Filepath: ${file} ${separatorLine}\n`;
+      } else {
+        outputWithColors += `${colors.yellow}Filepath: ${file}${colors.reset}\n`;
+        outputWithoutColors += `Filepath: ${file}\n`;
       }
       outputWithColors += `${colors.cyan}Content:${colors.reset}\n\`\`\`\n${content}\n\`\`\`\n\n`;
       outputWithoutColors += `Content:\n\`\`\`\n${content}\n\`\`\`\n\n`;
-    } catch (err) {
-      console.error(`Error reading file ${relativePath}: ${err.message}`);
     }
   }
 
   // Print the output with colors
   console.log(outputWithColors);
 
-  // Ask user if they want to copy the output to clipboard
-  const answer: string = await new Promise((resolve) => {
-    rl.question(
-      'Do you want to copy this output to the clipboard? (y/n): ',
-      resolve,
-    );
-  });
+  // Copy plain output to clipboard
+  await copyToClipboard(outputWithoutColors);
+  console.log('Output copied to clipboard.');
 
-  if (answer.toLowerCase() === 'y') {
-    await copyToClipboard(outputWithoutColors);
-    console.log('Output copied to clipboard.');
-  } else {
-    console.log('Output not copied.');
-  }
-
-  rl.close();
+  process.exit(0);
 }
 
 main();
