@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    // Enable latest features
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "allowJs": true,
+
+    // Bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    // Minimal strictness
+    "strict": false,
+    "noImplicitAny": false, // Allow implicit 'any' to avoid errors like 'err' is of type 'unknown'
+
+    // Enforce explicit return types for functions
+    "noImplicitReturns": true,
+
+    // Disable unused variable/parameter checks (as per your preference)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+
+    // Other best practices
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}
