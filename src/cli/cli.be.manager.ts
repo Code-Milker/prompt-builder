@@ -1,37 +1,44 @@
 // flowManager.ts - Flow manager implementation
 
-import type { Flow, FlowContext, FlowInput, FlowOutput } from './types';
+import type { Flow, FlowContext, FlowInput, FlowOutput } from './cli.use.types';
 import {
   colors,
   promptForNumber,
   promptUser,
   copyToSystemClipboard,
-} from './utils';
+  selectOption, // Import the enhanced selectOption function
+} from './cli.use.utils';
 
+/** Interface defining the FlowManager's methods */
 export interface FlowManager {
   registerFlow: (flow: Flow) => void;
   executeFlow: (flowName: string, input?: FlowInput) => Promise<FlowOutput>;
   getAvailableFlows: () => string[];
   runMainLoop: () => Promise<void>;
 }
+
+/** Creates and returns a FlowManager instance */
 export function createFlowManager(): FlowManager {
   const flows: Record<string, Flow> = {};
   const context: FlowContext = {
     clipboard: null,
     history: [],
   };
+  const terminalHistory: string[] = []; // Array to store terminal history for display
 
-  // Register a flow with the manager
+  // --- Core Functions ---
+
+  /** Registers a new flow with the manager */
   function registerFlow(flow: Flow): void {
     flows[flow.name] = flow;
   }
 
-  // Get list of available flows
+  /** Returns an array of all registered flow names */
   function getAvailableFlows(): string[] {
     return Object.keys(flows);
   }
 
-  // Execute a specific flow by name
+  /** Executes a flow by name with optional input */
   async function executeFlow(
     flowName: string,
     input?: FlowInput,
@@ -48,7 +55,7 @@ export function createFlowManager(): FlowManager {
     const flowInput = input || context.clipboard;
     const output = await flow.execute(flowInput);
 
-    // Record flow execution in history
+    // Record flow execution in context history
     context.history.push({
       flowName,
       input: flowInput,
@@ -62,37 +69,31 @@ export function createFlowManager(): FlowManager {
     return output;
   }
 
-  // Show flow selection menu
-  async function showFlowMenu(): Promise<string | null> {
-    console.log(
-      `\n${colors.bold}${colors.green}=== Available Flows ====${colors.reset}`,
+  // --- Interactive Flow Selection ---
+
+  /** Allows interactive selection of a flow with enhanced UI */
+  async function selectFlow(): Promise<string | null> {
+    const allFlows = getAvailableFlows().map((name) => flows[name]);
+    const selectedFlow = await selectOption(
+      allFlows,
+      (flow) => flow.name,
+      (flow, input) => {
+        const prefix = flow.name.slice(0, input.length);
+        const suffix = flow.name.slice(input.length);
+        return `${colors.cyan}${prefix}${colors.reset}${suffix} - ${flow.description}`;
+      },
+      terminalHistory,
+      'Select a flow:',
     );
-
-    const availableFlows = getAvailableFlows();
-    availableFlows.forEach((flowName, index) => {
-      const flow = flows[flowName];
-      console.log(`${index + 1}. ${flow.name} - ${flow.description}`);
-    });
-
-    console.log(`${availableFlows.length + 1}. Exit`);
-
-    const selection = await promptForNumber(
-      'Select a flow to execute: ',
-      1,
-      availableFlows.length + 1,
-    );
-
-    if (selection === availableFlows.length + 1) {
-      return null; // Exit
-    }
-
-    return availableFlows[selection - 1];
+    return selectedFlow ? selectedFlow.name : null;
   }
 
-  // Main loop
+  // --- Main Loop ---
+
+  /** Runs the main interactive loop of the flow manager */
   async function runMainLoop(): Promise<void> {
     while (true) {
-      const selectedFlow = await showFlowMenu();
+      const selectedFlow = await selectFlow();
 
       if (!selectedFlow) {
         console.log('Exiting...');
@@ -101,6 +102,12 @@ export function createFlowManager(): FlowManager {
 
       try {
         await executeFlow(selectedFlow);
+        terminalHistory.push(`Executed flow: ${selectedFlow}`);
+        if (context.clipboard) {
+          terminalHistory.push(
+            `Output: ${context.clipboard.toString().slice(0, 100)}...`,
+          );
+        }
         console.log(
           `\n${colors.green}Flow completed successfully.${colors.reset}`,
         );
@@ -122,6 +129,7 @@ export function createFlowManager(): FlowManager {
           }
         }
       } catch (error) {
+        terminalHistory.push(`Error: ${error.message}`);
         console.error(
           `${colors.red}Error executing flow: ${error.message}${colors.reset}`,
         );
@@ -129,6 +137,7 @@ export function createFlowManager(): FlowManager {
     }
   }
 
+  // Return the FlowManager instance
   return {
     registerFlow,
     executeFlow,

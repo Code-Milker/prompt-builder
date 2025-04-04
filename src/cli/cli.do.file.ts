@@ -1,10 +1,14 @@
 // fileSelectionFlow.ts - Native file selection using Bun’s process spawning
-
 import Bun from 'bun';
-import type { Flow } from './types';
-import { colors, promptUser, promptForNumber, displayPaginated } from './utils';
 import fs from 'fs';
 import path from 'path';
+import type { Flow } from './cli.use.types';
+import {
+  colors,
+  displayPaginated,
+  promptForNumber,
+  promptUser,
+} from './cli.use.utils';
 
 export function createFileSelectionFlow(): Flow {
   // Helper to list files using Bun’s native APIs

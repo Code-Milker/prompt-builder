@@ -1,19 +1,14 @@
 #!/usr/bin/env bun
-// index.ts - Main CLI driver
 
-import { createFlowManager } from './flow-manager';
-import { createFileSelectionFlow } from './file-selection-flow';
-import { createTextProcessingFlow } from './text-processing-flow';
+import { createFlowManager } from "./cli.be.manager";
+import { createFileSelectionFlow } from "./cli.do.file";
+import { createTextProcessingFlow } from "./cli.do.text";
 
 async function main() {
   // Create flow manager
   const flowManager = createFlowManager();
-
-  // Register flows
   flowManager.registerFlow(createFileSelectionFlow());
   flowManager.registerFlow(createTextProcessingFlow());
-
-  // Add more flows here by importing and registering them
 
   // Start the main loop
   await flowManager.runMainLoop();
