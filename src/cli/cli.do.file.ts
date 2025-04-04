@@ -8,6 +8,7 @@ import {
   displayPaginated,
   promptForNumber,
   promptUser,
+  selectOption,
 } from './cli.use.utils';
 
 export function createFileSelectionFlow(): Flow {
@@ -44,21 +45,28 @@ export function createFileSelectionFlow(): Flow {
       process.exit(0);
     }
 
-    console.log('\nAvailable files:');
-    files.forEach((file, index) => {
-      console.log(`${index + 1}. ${path.relative(process.cwd(), file)}`);
-    });
-
-    const selection = await promptUser('Enter file numbers (space) or "all": ');
-    if (selection.toLowerCase() === 'all') return files;
-
-    const indices = selection.split(' ').map((s) => parseInt(s.trim(), 10) - 1);
-    const selectedFiles = indices
-      .filter((i) => i >= 0 && i < files.length)
-      .map((i) => files[i]);
+    const selectedFiles = await selectOption(
+      files,
+      (file) => path.relative(process.cwd(), file),
+      (file, input) => {
+        const name = path.relative(process.cwd(), file);
+        const lowerName = name.toLowerCase();
+        const lowerInput = input.toLowerCase();
+        const matchIndex = lowerName.indexOf(lowerInput);
+        if (matchIndex !== -1 && input.length > 0) {
+          const prefix = name.slice(0, matchIndex);
+          const match = name.slice(matchIndex, matchIndex + input.length);
+          const suffix = name.slice(matchIndex + input.length);
+          return `${prefix}${colors.cyan}${match}${colors.reset}${suffix}`;
+        }
+        return name;
+      },
+      [], // No history for file selection
+      'Select files:',
+    );
 
     if (selectedFiles.length === 0) {
-      console.log('No valid files selected.');
+      console.log('No files selected.');
       process.exit(0);
     }
 
@@ -91,14 +99,23 @@ export function createFileSelectionFlow(): Flow {
 
       do {
         choice = await promptUser(
-          'Include full file (f), select range (r), read paginated (p), or skip (s)? ',
+          'How to process this file? (f: full file, r: select range, p: read paginated, s: skip)\n' +
+            ' - f: Include the entire file content.\n' +
+            ' - r: Select a range of lines to include (you can view the file first).\n' +
+            ' - p: Read the file in paginated mode (50 lines per page), then choose again.\n' +
+            ' - s: Skip this file and move to the next.\n' +
+            'Enter your choice: ',
         );
 
         if (choice.toLowerCase() === 'f') {
           content = await Bun.file(file).text();
         } else if (choice.toLowerCase() === 'r') {
           const viewChoice = await promptUser(
-            'View paginated (p) or all (a)? ',
+            'View file before selecting range? (p: paginated, a: all, n: no)\n' +
+              ' - p: View 50 lines at a time (press Enter to continue, q to stop).\n' +
+              ' - a: View all lines at once.\n' +
+              ' - n: Skip viewing and enter line numbers directly.\n' +
+              'Enter your choice: ',
           );
           const fileContent = await Bun.file(file).text();
           const lines = fileContent.split('\n');
@@ -107,7 +124,7 @@ export function createFileSelectionFlow(): Flow {
 
           if (viewChoice.toLowerCase() === 'p') {
             await displayPaginated(lines, totalLines);
-          } else {
+          } else if (viewChoice.toLowerCase() === 'a') {
             lines.forEach((line, i) =>
               console.log(`${(i + 1).toString().padStart(4)} ${line}`),
             );
@@ -126,7 +143,7 @@ export function createFileSelectionFlow(): Flow {
         } else if (choice.toLowerCase() === 's') {
           console.log('Skipping this file.');
         } else {
-          console.log('Invalid choice. Enter f, r, p, or s.');
+          console.log('Invalid choice. Please enter f, r, p, or s.');
         }
       } while (choice.toLowerCase() === 'p');
 
@@ -150,7 +167,7 @@ export function createFileSelectionFlow(): Flow {
   }
 
   return {
-    name: 'FileSelection',
+    name: 'file.selection',
     description: 'Select and process files using Bun’s native APIs',
     execute,
   };

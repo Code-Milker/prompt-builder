@@ -68,8 +68,8 @@ export function createTextProcessingFlow(): Flow {
   }
 
   return {
-    name: 'TextProcessing',
-    description: 'Process and transform text',
+    name: 'text',
+    description: 'do something with text',
     execute,
   };
 }

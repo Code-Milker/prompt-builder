@@ -7,7 +7,7 @@ import { stdin, stdout } from 'node:process';
 import type { Colors } from './cli.use.types';
 
 // Promisify exec for async/await
-export const execPromise = promisify(exec);
+export const executivePromise = promisify(exec);
 
 // Colors for output
 export const colors: Colors = {
@@ -106,87 +106,159 @@ export async function displayPaginated(
   }
 }
 
-// Enhanced function to select an option interactively with history
+// Function to draw a box
+export function drawBox(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  title: string = '',
+) {
+  const horizontal = '─'.repeat(width - 2);
+  const top = `┌${horizontal}┐`;
+  const bottom = `└${horizontal}┘`;
+  const middle = `│${' '.repeat(width - 2)}│`;
+
+  process.stdout.write(`\x1b[${y};${x}H${top}`);
+  for (let i = 1; i < height - 1; i++) {
+    process.stdout.write(`\x1b[${y + i};${x}H${middle}`);
+  }
+  process.stdout.write(`\x1b[${y + height - 1};${x}H${bottom}`);
+
+  if (title) {
+    const titleX = x + Math.floor((width - title.length) / 2);
+    process.stdout.write(`\x1b[${y};${titleX}H${title}`);
+  }
+}
+
+// Enhanced function to select options interactively with history and multi-selection
 export async function selectOption<T>(
   options: T[],
   getName: (option: T) => string,
   display: (option: T, input: string) => string,
   history: string[],
   promptMessage: string = 'Select an option:',
-): Promise<T | null> {
+  maxDisplay: number = 10,
+): Promise<T[]> {
   return new Promise((resolve) => {
     let currentInput = '';
-    const filteredOptions = () =>
-      options.filter((opt) =>
-        getName(opt).toLowerCase().startsWith(currentInput.toLowerCase()),
-      );
+    let selectedOptions: T[] = [];
+    let availableOptions = [...options];
 
     function render() {
-      const rows = process.stdout.rows || 24; // Default to 24 if not available
+      const rows = process.stdout.rows || 24;
+      const cols = process.stdout.columns || 80;
       const historyLines = Math.min(5, history.length);
-      const optionsStart = historyLines + 1;
-      const optionsLines = 5;
-      const inputLine = rows;
+      const optionsStart = historyLines + 3;
+      const splitCol = Math.floor(cols / 2);
 
       // Clear screen
       stdout.write('\x1b[2J\x1b[1;1H');
 
       // Display history
       for (let i = 0; i < historyLines; i++) {
-        const line = history[history.length - historyLines + i];
-        stdout.write(`\x1b[${i + 1};1H\x1b[K${line}`);
+        const line = history[history.length - historyLines + i] || '';
+        stdout.write(`\x1b[${i + 1};1H\x1b[K${line.slice(0, cols - 1)}`);
       }
 
-      // Display options
-      const visibleOptions = filteredOptions().slice(0, optionsLines);
-      visibleOptions.forEach((opt, index) => {
+      // Headers
+      stdout.write(
+        `\x1b[${historyLines + 1};1H${colors.bold}Available Flows${colors.reset}`,
+      );
+      stdout.write(
+        `\x1b[${historyLines + 1};${splitCol + 1}H${colors.bold}Selected Flows${colors.reset}`,
+      );
+      stdout.write(`\x1b[${historyLines + 2};1H${'─'.repeat(splitCol - 1)}`);
+      stdout.write(
+        `\x1b[${historyLines + 2};${splitCol + 1}H${'─'.repeat(cols - splitCol - 1)}`,
+      );
+
+      // Available options
+      const lowerInput = currentInput.toLowerCase();
+      const sortedAvailable = [...availableOptions].sort((a, b) => {
+        const aName = getName(a).toLowerCase();
+        const bName = getName(b).toLowerCase();
+        const aMatch = aName.includes(lowerInput);
+        const bMatch = bName.includes(lowerInput);
+        return aMatch && !bMatch ? -1 : !aMatch && bMatch ? 1 : 0;
+      });
+      sortedAvailable.slice(0, maxDisplay).forEach((opt, index) => {
         const displayText = display(opt, currentInput);
-        stdout.write(`\x1b[${optionsStart + index};1H\x1b[K${displayText}`);
+        stdout.write(
+          `\x1b[${optionsStart + index};1H\x1b[K${displayText.slice(0, splitCol - 1)}`,
+        );
       });
 
-      // Clear remaining option lines
-      for (let i = visibleOptions.length; i < optionsLines; i++) {
-        stdout.write(`\x1b[${optionsStart + i};1H\x1b[K`);
-      }
+      // Selected options
+      selectedOptions.slice(0, maxDisplay).forEach((opt, index) => {
+        const name = `${colors.green}${getName(opt)}${colors.reset}`;
+        stdout.write(
+          `\x1b[${optionsStart + index};${splitCol + 1}H\x1b[K${name.slice(0, cols - splitCol - 1)}`,
+        );
+      });
 
-      // Display input
+      // Instruction box
+      const instructionWidth = cols - 4;
+      const instructionHeight = 5;
+      const instructionY = rows - 8;
+      drawBox(
+        2,
+        instructionY,
+        instructionWidth,
+        instructionHeight,
+        'Instructions',
+      );
+      const instructions = [
+        promptMessage,
+        'Type to filter, Space to select, Enter to confirm',
+      ];
+      instructions.forEach((line, index) => {
+        const padding = Math.floor((instructionWidth - 2 - line.length) / 2);
+        stdout.write(
+          `\x1b[${instructionY + 1 + index};3H${colors.yellow}${line}${colors.reset}`,
+        );
+      });
+
+      // Input box at bottom
+      const inputBoxWidth = cols - 2;
+      const inputBoxHeight = 3;
+      const inputBoxY = rows - inputBoxHeight;
+      drawBox(1, inputBoxY, inputBoxWidth, inputBoxHeight);
       stdout.write(
-        `\x1b[${inputLine};1H\x1b[K${colors.bold}${colors.yellow}${promptMessage}${colors.reset} ${colors.green}${currentInput}${colors.reset}`,
+        `\x1b[${inputBoxY + 1};2H${colors.green}> ${currentInput}${colors.reset}`,
       );
     }
 
-    // Initial render
     render();
 
-    // Enable raw mode
     stdin.setRawMode(true);
     stdin.resume();
     stdin.setEncoding('utf8');
 
     const onData = (data: string) => {
       const char = data.toString();
-
-      if (char === '\x03' || char === '\x1b') {
-        // Ctrl+C or Escape
-        cleanupAndExit(null);
+      if (char === '\x03') {
+        // Ctrl+C
+        cleanupAndExit([]);
       } else if (char === '\r') {
         // Enter
-        const matches = filteredOptions();
-        if (matches.length === 1) {
-          cleanupAndExit(matches[0]);
-        } else if (matches.length > 1) {
-          history.push('Multiple matches, keep typing...');
-          render();
-        } else {
-          history.push('No matches found');
+        cleanupAndExit(selectedOptions);
+      } else if (char === ' ') {
+        // Space: Select first match
+        const matches = availableOptions.filter((opt) =>
+          getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
+        );
+        if (matches.length > 0) {
+          const selected = matches[0];
+          availableOptions = availableOptions.filter((opt) => opt !== selected);
+          selectedOptions.push(selected);
+          currentInput = '';
           render();
         }
       } else if (char === '\x7f') {
         // Backspace
-        if (currentInput.length > 0) {
-          currentInput = currentInput.slice(0, -1);
-          render();
-        }
+        currentInput = currentInput.slice(0, -1);
+        render();
       } else if (char >= ' ' && char <= '~') {
         // Printable characters
         currentInput += char;
@@ -194,7 +266,7 @@ export async function selectOption<T>(
       }
     };
 
-    function cleanupAndExit(result: T | null) {
+    function cleanupAndExit(result: T[]) {
       stdin.setRawMode(false);
       stdin.removeListener('data', onData);
       stdout.write('\n');
