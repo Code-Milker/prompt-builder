@@ -1,16 +1,16 @@
 #!/usr/bin/env bun
 
-import { createFlowManager } from "./cli.be.manager";
-import { createFileSelectionFlow } from "./cli.do.file";
-import { createTextProcessingFlow } from "./cli.do.text";
+import { createFlowManager } from './cli.be.manager';
+import { createFileSelectionFlow } from './cli.do.file';
+import { createLightControlFlow } from './cli.do.light';
+import { createTextProcessingFlow } from './cli.do.text';
 
 async function main() {
-  // Create flow manager
   const flowManager = createFlowManager();
   flowManager.registerFlow(createFileSelectionFlow());
   flowManager.registerFlow(createTextProcessingFlow());
+  flowManager.registerFlow(createLightControlFlow()); // Register lights flow
 
-  // Start the main loop
   await flowManager.runMainLoop();
 }
 

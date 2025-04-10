@@ -7,7 +7,7 @@ import {
   drawBox,
   copyToSystemClipboard,
 } from './cli.use.utils';
-import { stdin, stdout } from 'node:process';
+import { stdin } from 'node:process';
 import * as readline from 'node:readline';
 
 /** Interface defining the FlowManager's methods */

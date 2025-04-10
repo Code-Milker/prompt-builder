@@ -2,7 +2,6 @@
 import Bun from 'bun';
 import fs from 'fs';
 import path from 'path';
-import type { Flow } from './cli.use.types';
 import {
   colors,
   displayPaginated,
@@ -10,6 +9,7 @@ import {
   promptUser,
   selectOption,
 } from './cli.use.utils';
+import type { Flow } from './cli.use.types';
 
 export function createFileSelectionFlow(): Flow {
   // Helper to list files using Bun’s native APIs
