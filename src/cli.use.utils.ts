@@ -241,7 +241,16 @@ export async function selectOption<T>(
         // Ctrl+C
         cleanupAndExit([]);
       } else if (char === '\r') {
-        // Enter
+        const matches = availableOptions.filter((opt) =>
+          getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
+        );
+        if (matches.length > 0) {
+          const selected = matches[0];
+          availableOptions = availableOptions.filter((opt) => opt !== selected);
+          selectedOptions.push(selected);
+          currentInput = '';
+          render();
+        }
         cleanupAndExit(selectedOptions);
       } else if (char === ' ') {
         // Space: Select first match
