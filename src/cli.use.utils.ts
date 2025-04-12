@@ -144,6 +144,7 @@ export async function selectOption<T>(
     let currentInput = '';
     let selectedOptions: T[] = [];
     let availableOptions = [...options];
+    let errorMessage = ''; // To display error when trying to confirm without selections
 
     function render() {
       const rows = process.stdout.rows || 24;
@@ -216,12 +217,11 @@ export async function selectOption<T>(
       const instructions = [
         promptMessage,
         'Type to filter, Space to select, Enter to confirm',
-      ];
+        errorMessage ? `${colors.red}${errorMessage}${colors.reset}` : '',
+      ].filter(Boolean); // Remove empty error message
       instructions.forEach((line, index) => {
         const padding = Math.floor((instructionWidth - 2 - line.length) / 2);
-        stdout.write(
-          `\x1b[${instructionY + 1 + index};3H${colors.yellow}${line}${colors.reset}`,
-        );
+        stdout.write(`\x1b[${instructionY + 1 + index};3H${line}`);
       });
 
       // Input box at bottom
@@ -263,6 +263,7 @@ export async function selectOption<T>(
             selectedOptions = selectedOptions.filter((opt) => opt !== selected);
           }
           currentInput = '';
+          errorMessage = ''; // Clear error message on successful action
           render();
         }
       } else if (char === '\r') {
@@ -282,14 +283,22 @@ export async function selectOption<T>(
             }
           }
         }
-        cleanupAndExit(selectedOptions);
+        // Check if at least one option is selected
+        if (selectedOptions.length === 0) {
+          errorMessage = 'You must select at least one option.';
+          render();
+        } else {
+          cleanupAndExit(selectedOptions);
+        }
       } else if (char === '\x7f') {
         // Backspace
         currentInput = currentInput.slice(0, -1);
+        errorMessage = ''; // Clear error message on input change
         render();
       } else if (char >= ' ' && char <= '~') {
         // Printable characters: add to filter input
         currentInput += char;
+        errorMessage = ''; // Clear error message on input change
         render();
       }
     };
