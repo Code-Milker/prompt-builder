@@ -16,6 +16,7 @@ export const colors: Colors = {
   yellow: '\x1b[33m',
   green: '\x1b[32m',
   red: '\x1b[31m',
+  gray: '\x1b[90m', // Added gray for non-selected modes
   bold: '\x1b[1m',
 };
 
@@ -115,15 +116,7 @@ export function drawBox(
   title: string = '',
 ) {
   const horizontal = '─'.repeat(width - 2);
-  const top = `┌${horizontal}┐`;
   const bottom = `└${horizontal}┘`;
-  const middle = `│${' '.repeat(width - 2)}│`;
-
-  // process.stdout.write(`\x1b[${y};${x}H${top}`);
-  // for (let i = 1; i < height - 1; i++) {
-  //   process.stdout.write(`\x1b[${y + i};${x}H${middle}`);
-  // }
-  // process.stdout.write(`\x1b[${y + height - 1};${x}H${bottom}`);
 }
 
 // Function to draw text with a full-width line underneath, with styled segments
@@ -172,18 +165,30 @@ export async function selectOption<T>(
     let currentInput = '';
     let selectedOptions: T[] = [];
     let availableOptions = [...options];
-    let errorMessage = ''; // To display error when trying to confirm without selections
+    let errorMessage = ''; // To display error in the input box
+    const selectionTypes = [
+      'single',
+      'allHighlighted',
+      'range',
+      'selectAll',
+      'unselectAll',
+    ] as const;
+    type SelectionType = (typeof selectionTypes)[number];
+    let currentSelectionTypeIndex = 0; // Start with 'single'
 
     function render() {
       const rows = process.stdout.rows || 24;
       const cols = process.stdout.columns || 80;
       const historyLines = Math.min(5, history.length);
-      const paddingTop = 2; // Padding from the top
-      const paddingLeft = 2; // Padding from the left
+      const paddingTop = 1; // Padding from the top
+      const paddingLeft = 1; // Padding from the left
+      const indent = 2; // Indentation for commands and options (align with option numbers)
       const instructionsStart = paddingTop; // Start with padding from the top
-      const optionsStart =
-        instructionsStart + historyLines + (errorMessage ? 2 : 0); // Adjust for history and error
-      const optionsDisplayStart = optionsStart + 2; // After header
+      const commandsStart = instructionsStart + historyLines; // After history
+      const spaceSelectLine = commandsStart + 1; // Line for [space: select]
+      const enterConfirmLine = spaceSelectLine + 1; // Line for [enter: confirm] and modes
+      const optionsStart = enterConfirmLine + 1; // After commands
+      const optionsDisplayStart = optionsStart + 1; // After the line underneath
 
       // Clear screen, reset scroll region, and move cursor to top-left
       stdout.write('\x1b[2J\x1b[?1049h\x1b[H\x1b[0;0r');
@@ -196,23 +201,41 @@ export async function selectOption<T>(
         );
       }
 
-      // Error message (if any) with padding
-      if (errorMessage) {
-        drawLine(paddingLeft, instructionsStart + historyLines, [
-          { text: errorMessage, color: 'red' },
-        ]);
-      }
+      // Commands section
+      stdout.write(
+        `\x1b[${commandsStart};${paddingLeft}H\x1b[K${colors.cyan}${colors.bold}Commands:${colors.reset}`,
+      );
+      stdout.write(
+        `\x1b[${spaceSelectLine};${indent}H\x1b[K${colors.yellow}[space: select]${colors.reset}`,
+      );
+      let enterConfirmText = `${colors.yellow}[enter: confirm]${colors.reset} `;
+      selectionTypes.forEach((type, index) => {
+        const displayText =
+          type === 'single'
+            ? 'select first match'
+            : type === 'allHighlighted'
+              ? 'select all matches'
+              : type === 'range'
+                ? 'select range'
+                : type === 'selectAll'
+                  ? 'select all'
+                  : 'unselect all';
+        const color =
+          index === currentSelectionTypeIndex ? colors.green : colors.gray;
+        const bold = index === currentSelectionTypeIndex ? colors.bold : '';
+        enterConfirmText += `${color}${bold}${displayText}${colors.reset}${index < selectionTypes.length - 1 ? ' | ' : ''}`;
+      });
+      stdout.write(
+        `\x1b[${enterConfirmLine};${indent}H\x1b[K${enterConfirmText}`,
+      );
 
-      // Header for options with shortcuts, with padding
+      // Available Options header
       drawLine(paddingLeft, optionsStart, [
         {
           text: `Available Options (${selectedOptions.length}/${options.length})`,
+          color: 'cyan',
           bold: true,
         },
-        { text: '  ' }, // Spacer
-        { text: '[space: select]', color: 'yellow', bold: true },
-        { text: '  ' }, // Spacer
-        { text: '[enter: confirm]', color: 'yellow', bold: true },
       ]);
 
       // Sort selected options alphabetically
@@ -240,6 +263,45 @@ export async function selectOption<T>(
         maxDisplay,
       );
 
+      // Determine which options to highlight based on the current selection type
+      let highlightedOptions: Set<T> = new Set();
+      let highlightColor: keyof Colors = 'cyan'; // Default highlight color
+      const currentType = selectionTypes[currentSelectionTypeIndex];
+      if (currentType === 'single' && currentInput) {
+        const firstMatch = availableOptions.find((opt, idx) => {
+          const optionNumber = (idx + 1).toString();
+          const name = getName(opt).toLowerCase();
+          const searchText = `${optionNumber} ${name}`;
+          return searchText.includes(lowerInput);
+        });
+        if (firstMatch) highlightedOptions.add(firstMatch);
+      } else if (currentType === 'allHighlighted' && currentInput) {
+        availableOptions.forEach((opt, idx) => {
+          const optionNumber = (idx + 1).toString();
+          const name = getName(opt).toLowerCase();
+          const searchText = `${optionNumber} ${name}`;
+          if (searchText.includes(lowerInput)) {
+            highlightedOptions.add(opt);
+          }
+        });
+      } else if (currentType === 'range' && currentInput) {
+        const rangeMatch = currentInput.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          if (start <= end && start >= 1 && end <= availableOptions.length) {
+            for (let i = start - 1; i < end; i++) {
+              highlightedOptions.add(availableOptions[i]);
+            }
+          }
+        }
+      } else if (currentType === 'selectAll') {
+        availableOptions.forEach((opt) => highlightedOptions.add(opt));
+      } else if (currentType === 'unselectAll') {
+        selectedOptions.forEach((opt) => highlightedOptions.add(opt));
+        highlightColor = 'red'; // Use red for unselect all
+      }
+
       // Display options with numbering and padding
       displayOptions.forEach((opt, index) => {
         const optionNumber = (availableOptions.indexOf(opt) + 1).toString();
@@ -247,32 +309,37 @@ export async function selectOption<T>(
         const numberedText = `${optionNumber.padStart(2, ' ')}. ${displayText}`;
         const searchText = `${optionNumber} ${displayText.toLowerCase()}`; // Include number in search
         // Highlight if selected
-        const finalText = selectedOptions.includes(opt)
+        let finalText = selectedOptions.includes(opt)
           ? `${colors.green}${numberedText}${colors.reset}`
           : numberedText;
-        // Apply highlighting for search matches (if needed)
-        const isMatch = searchText.includes(lowerInput);
-        const outputText =
-          isMatch && lowerInput
-            ? `${colors.cyan}${finalText}${colors.reset}`
-            : finalText;
+        // Apply highlighting based on the current selection type
+        if (highlightedOptions.has(opt)) {
+          finalText = `${colors[highlightColor]}${finalText}${colors.reset}`;
+        }
         stdout.write(
-          `\x1b[${optionsDisplayStart + index};${paddingLeft}H\x1b[K${outputText.slice(0, cols - paddingLeft - 1)}`,
+          `\x1b[${optionsDisplayStart + index};${paddingLeft}H\x1b[K${finalText.slice(0, cols - paddingLeft - 1)}`,
         );
       });
 
       // Input box at the very bottom with padding
       const inputBoxWidth = cols - 2 * paddingLeft;
-      const inputBoxHeight = 3; // Increased height to 5 lines
-      const inputBoxY = rows - 2; // Ensure it's at the very bottom
+      const inputBoxHeight = 5; // Increased height to 5 lines
+      const inputBoxY = rows - inputBoxHeight; // Ensure it's at the very bottom
       drawBox(paddingLeft, inputBoxY, inputBoxWidth, inputBoxHeight);
-      // Draw the input prompt and current input, centered vertically in the taller box
-      const inputPrompt = `${colors.green}> ${currentInput}${colors.reset}`;
+      // Draw the input prompt and current input, or error message if present
+      const inputPrompt = errorMessage
+        ? `${colors.red}Error: ${errorMessage} (type to clear)${colors.reset}`
+        : `${colors.green}> ${currentInput}${colors.reset}`;
       const inputPromptY = inputBoxY + Math.floor(inputBoxHeight / 2); // Center vertically
       stdout.write(`\x1b[${inputPromptY};${paddingLeft + 1}H${inputPrompt}`);
-      // Move the cursor to the end of the current input and show it
-      const cursorX = paddingLeft + 1 + 2 + currentInput.length; // paddingLeft + 1 for box border, 2 for "> ", then input length
-      stdout.write(`\x1b[${inputPromptY};${cursorX}H\x1b[?25h`);
+      // Move the cursor to the end of the current input and show it (only if no error)
+      if (!errorMessage) {
+        const cursorX = paddingLeft + 1 + 2 + currentInput.length; // paddingLeft + 1 for box border, 2 for "> ", then input length
+        stdout.write(`\x1b[${inputPromptY};${cursorX}H\x1b[?25h`);
+      } else {
+        // Hide cursor when error message is displayed
+        stdout.write(`\x1b[?25l`);
+      }
     }
 
     render();
@@ -310,32 +377,130 @@ export async function selectOption<T>(
           errorMessage = ''; // Clear error message on successful action
           render();
         }
+      } else if (char === '\t') {
+        // Tab: cycle through selection types and clear input
+        currentSelectionTypeIndex =
+          (currentSelectionTypeIndex + 1) % selectionTypes.length;
+        currentInput = ''; // Clear input on tab
+        errorMessage = ''; // Clear error message
+        render();
       } else if (char === '\r') {
-        // Enter: select partially typed option (if any) and confirm
-        if (currentInput) {
-          const matches = availableOptions.filter((opt, idx) => {
-            const optionNumber = (idx + 1).toString();
-            const name = getName(opt).toLowerCase();
-            const searchText = `${optionNumber} ${name}`;
-            return searchText.includes(currentInput.toLowerCase());
-          });
-          if (matches.length > 0) {
-            const selected = matches[0];
+        // Enter: execute based on current selection type
+        const currentType = selectionTypes[currentSelectionTypeIndex];
+        if (currentType === 'single') {
+          // Single select: select the first match and confirm
+          if (currentInput) {
+            const matches = availableOptions.filter((opt, idx) => {
+              const optionNumber = (idx + 1).toString();
+              const name = getName(opt).toLowerCase();
+              const searchText = `${optionNumber} ${name}`;
+              return searchText.includes(currentInput.toLowerCase());
+            });
+            if (matches.length > 0) {
+              const selected = matches[0];
+              if (
+                !selectedOptions.includes(selected) &&
+                (maxSelections === undefined ||
+                  selectedOptions.length < maxSelections)
+              ) {
+                selectedOptions.push(selected);
+              }
+            } else {
+              errorMessage = 'No options match your search.';
+              render();
+              return;
+            }
+          }
+          // Check if at least one option is selected
+          if (selectedOptions.length === 0) {
+            errorMessage = 'You must select at least one option.';
+            render();
+          } else {
+            cleanupAndExit(selectedOptions);
+          }
+        } else if (currentType === 'allHighlighted') {
+          // Select all highlighted options
+          if (currentInput) {
+            const matches = availableOptions.filter((opt, idx) => {
+              const optionNumber = (idx + 1).toString();
+              const name = getName(opt).toLowerCase();
+              const searchText = `${optionNumber} ${name}`;
+              return searchText.includes(currentInput.toLowerCase());
+            });
+            if (matches.length > 0) {
+              matches.forEach((opt) => {
+                if (
+                  !selectedOptions.includes(opt) &&
+                  (maxSelections === undefined ||
+                    selectedOptions.length < maxSelections)
+                ) {
+                  selectedOptions.push(opt);
+                } else if (selectedOptions.includes(opt)) {
+                  selectedOptions = selectedOptions.filter((o) => o !== opt);
+                }
+              });
+              currentInput = '';
+              errorMessage = ''; // Clear error message
+              render();
+            } else {
+              errorMessage = 'No options match your search.';
+              render();
+            }
+          } else {
+            errorMessage = 'Enter a search term to highlight options.';
+            render();
+          }
+        } else if (currentType === 'range') {
+          // Select range
+          const rangeInput = currentInput.trim();
+          const rangeMatch = rangeInput.match(/^(\d+)-(\d+)$/);
+          if (rangeMatch) {
+            const start = parseInt(rangeMatch[1], 10);
+            const end = parseInt(rangeMatch[2], 10);
+            if (start <= end && start >= 1 && end <= availableOptions.length) {
+              for (let i = start - 1; i < end; i++) {
+                const opt = availableOptions[i];
+                if (
+                  !selectedOptions.includes(opt) &&
+                  (maxSelections === undefined ||
+                    selectedOptions.length < maxSelections)
+                ) {
+                  selectedOptions.push(opt);
+                } else if (selectedOptions.includes(opt)) {
+                  selectedOptions = selectedOptions.filter((o) => o !== opt);
+                }
+              }
+              currentInput = '';
+              errorMessage = ''; // Clear error message
+              render();
+            } else {
+              errorMessage = `Invalid range: must be between 1 and ${availableOptions.length}`;
+              render();
+            }
+          } else {
+            errorMessage = 'Enter range (e.g., 3-5)';
+            render();
+          }
+        } else if (currentType === 'selectAll') {
+          // Select all options
+          availableOptions.forEach((opt) => {
             if (
-              !selectedOptions.includes(selected) &&
+              !selectedOptions.includes(opt) &&
               (maxSelections === undefined ||
                 selectedOptions.length < maxSelections)
             ) {
-              selectedOptions.push(selected);
+              selectedOptions.push(opt);
             }
-          }
-        }
-        // Check if at least one option is selected
-        if (selectedOptions.length === 0) {
-          errorMessage = 'You must select at least one option.';
+          });
+          currentInput = '';
+          errorMessage = '';
           render();
-        } else {
-          cleanupAndExit(selectedOptions);
+        } else if (currentType === 'unselectAll') {
+          // Unselect all options
+          selectedOptions = [];
+          currentInput = '';
+          errorMessage = '';
+          render();
         }
       } else if (char === '\x7f') {
         // Backspace

@@ -26,4 +26,5 @@ export type Colors = {
   green: string;
   red: string;
   bold: string;
+  gray: string;
 };
