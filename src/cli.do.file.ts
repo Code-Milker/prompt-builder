@@ -63,6 +63,7 @@ export function createFileSelectionFlow(): Flow {
       },
       [], // No history for file selection
       'Select files:',
+      50,
     );
 
     if (selectedFiles.length === 0) {
@@ -76,16 +77,9 @@ export function createFileSelectionFlow(): Flow {
   // Main execution logic
   async function execute(input?: any): Promise<any> {
     const projectRoot = process.cwd();
-    const dirPrompt = await promptUser(
-      'Enter directory to search (Enter for current): ',
-    );
-    const searchDir =
-      dirPrompt.trim() === ''
-        ? projectRoot
-        : path.resolve(projectRoot, dirPrompt);
 
     console.log('Listing files...');
-    const files = await listFiles(searchDir);
+    const files = await listFiles(projectRoot);
     const selectedFiles = await selectFiles(files);
 
     let outputWithColors = '\n**Results:**\n';

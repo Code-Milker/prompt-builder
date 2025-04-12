@@ -131,7 +131,6 @@ export function drawBox(
   }
 }
 
-// Enhanced function to select options interactively with history and multi-selection
 export async function selectOption<T>(
   options: T[],
   getName: (option: T) => string,
@@ -139,6 +138,7 @@ export async function selectOption<T>(
   history: string[],
   promptMessage: string = 'Select an option:',
   maxDisplay: number = 10,
+  maxSelections?: number, // Optional limit on number of selections
 ): Promise<T[]> {
   return new Promise((resolve) => {
     let currentInput = '';
@@ -150,7 +150,6 @@ export async function selectOption<T>(
       const cols = process.stdout.columns || 80;
       const historyLines = Math.min(5, history.length);
       const optionsStart = historyLines + 3;
-      const splitCol = Math.floor(cols / 2);
 
       // Clear screen
       stdout.write('\x1b[2J\x1b[1;1H');
@@ -161,39 +160,45 @@ export async function selectOption<T>(
         stdout.write(`\x1b[${i + 1};1H\x1b[K${line.slice(0, cols - 1)}`);
       }
 
-      // Headers
+      // Header
       stdout.write(
-        `\x1b[${historyLines + 1};1H${colors.bold}Available Flows${colors.reset}`,
+        `\x1b[${historyLines + 1};1H${colors.bold}Available Options (${selectedOptions.length}/${options.length})${colors.reset}`,
       );
-      stdout.write(
-        `\x1b[${historyLines + 1};${splitCol + 1}H${colors.bold}Selected Flows${colors.reset}`,
-      );
-      stdout.write(`\x1b[${historyLines + 2};1H${'─'.repeat(splitCol - 1)}`);
-      stdout.write(
-        `\x1b[${historyLines + 2};${splitCol + 1}H${'─'.repeat(cols - splitCol - 1)}`,
-      );
+      stdout.write(`\x1b[${historyLines + 2};1H${'─'.repeat(cols - 1)}`);
 
-      // Available options
-      const lowerInput = currentInput.toLowerCase();
-      const sortedAvailable = [...availableOptions].sort((a, b) => {
+      // Sort selected options alphabetically
+      const sortedSelected = [...selectedOptions].sort((a, b) => {
         const aName = getName(a).toLowerCase();
         const bName = getName(b).toLowerCase();
-        const aMatch = aName.includes(lowerInput);
-        const bMatch = bName.includes(lowerInput);
-        return aMatch && !bMatch ? -1 : !aMatch && bMatch ? 1 : 0;
-      });
-      sortedAvailable.slice(0, maxDisplay).forEach((opt, index) => {
-        const displayText = display(opt, currentInput);
-        stdout.write(
-          `\x1b[${optionsStart + index};1H\x1b[K${displayText.slice(0, splitCol - 1)}`,
-        );
+        return aName < bName ? -1 : aName > bName ? 1 : 0;
       });
 
-      // Selected options
-      selectedOptions.slice(0, maxDisplay).forEach((opt, index) => {
-        const name = `${colors.green}${getName(opt)}${colors.reset}`;
+      // Filter and sort unselected options
+      const lowerInput = currentInput.toLowerCase();
+      const sortedUnselected = availableOptions
+        .filter((opt) => !selectedOptions.includes(opt))
+        .sort((a, b) => {
+          const aName = getName(a).toLowerCase();
+          const bName = getName(b).toLowerCase();
+          const aMatch = aName.includes(lowerInput);
+          const bMatch = bName.includes(lowerInput);
+          return aMatch && !bMatch ? -1 : !aMatch && bMatch ? 1 : 0;
+        });
+
+      // Combine selected and unselected options, with selected at the top
+      const displayOptions = [...sortedSelected, ...sortedUnselected].slice(
+        0,
+        maxDisplay,
+      );
+
+      // Display options
+      displayOptions.forEach((opt, index) => {
+        let displayText = display(opt, currentInput);
+        if (selectedOptions.includes(opt)) {
+          displayText = `${colors.green}${displayText}${colors.reset}`;
+        }
         stdout.write(
-          `\x1b[${optionsStart + index};${splitCol + 1}H\x1b[K${name.slice(0, cols - splitCol - 1)}`,
+          `\x1b[${optionsStart + index};1H\x1b[K${displayText.slice(0, cols - 1)}`,
         );
       });
 
@@ -238,38 +243,52 @@ export async function selectOption<T>(
     const onData = (data: string) => {
       const char = data.toString();
       if (char === '\x03') {
-        // Ctrl+C
+        // Ctrl+C: cancel
         cleanupAndExit([]);
-      } else if (char === '\r') {
+      } else if (char === ' ') {
+        // Space: toggle selection of first match
         const matches = availableOptions.filter((opt) =>
           getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
         );
         if (matches.length > 0) {
           const selected = matches[0];
-          availableOptions = availableOptions.filter((opt) => opt !== selected);
-          selectedOptions.push(selected);
+          // Only allow selection if under maxSelections limit (if defined)
+          if (
+            !selectedOptions.includes(selected) &&
+            (maxSelections === undefined ||
+              selectedOptions.length < maxSelections)
+          ) {
+            selectedOptions.push(selected);
+          } else if (selectedOptions.includes(selected)) {
+            selectedOptions = selectedOptions.filter((opt) => opt !== selected);
+          }
           currentInput = '';
           render();
+        }
+      } else if (char === '\r') {
+        // Enter: select partially typed option (if any) and confirm
+        if (currentInput) {
+          const matches = availableOptions.filter((opt) =>
+            getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
+          );
+          if (matches.length > 0) {
+            const selected = matches[0];
+            if (
+              !selectedOptions.includes(selected) &&
+              (maxSelections === undefined ||
+                selectedOptions.length < maxSelections)
+            ) {
+              selectedOptions.push(selected);
+            }
+          }
         }
         cleanupAndExit(selectedOptions);
-      } else if (char === ' ') {
-        // Space: Select first match
-        const matches = availableOptions.filter((opt) =>
-          getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
-        );
-        if (matches.length > 0) {
-          const selected = matches[0];
-          availableOptions = availableOptions.filter((opt) => opt !== selected);
-          selectedOptions.push(selected);
-          currentInput = '';
-          render();
-        }
       } else if (char === '\x7f') {
         // Backspace
         currentInput = currentInput.slice(0, -1);
         render();
       } else if (char >= ' ' && char <= '~') {
-        // Printable characters
+        // Printable characters: add to filter input
         currentInput += char;
         render();
       }
