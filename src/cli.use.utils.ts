@@ -119,16 +119,45 @@ export function drawBox(
   const bottom = `└${horizontal}┘`;
   const middle = `│${' '.repeat(width - 2)}│`;
 
-  process.stdout.write(`\x1b[${y};${x}H${top}`);
-  for (let i = 1; i < height - 1; i++) {
-    process.stdout.write(`\x1b[${y + i};${x}H${middle}`);
-  }
-  process.stdout.write(`\x1b[${y + height - 1};${x}H${bottom}`);
+  // process.stdout.write(`\x1b[${y};${x}H${top}`);
+  // for (let i = 1; i < height - 1; i++) {
+  //   process.stdout.write(`\x1b[${y + i};${x}H${middle}`);
+  // }
+  // process.stdout.write(`\x1b[${y + height - 1};${x}H${bottom}`);
+}
 
-  if (title) {
-    const titleX = x + Math.floor((width - title.length) / 2);
-    process.stdout.write(`\x1b[${y};${titleX}H${title}`);
+// Function to draw text with a full-width line underneath, with styled segments
+export function drawLine(
+  x: number,
+  y: number,
+  segments: { text: string; color?: keyof Colors; bold?: boolean }[],
+) {
+  const cols = process.stdout.columns || 80;
+  const line = '─'.repeat(cols - 1); // Full-width line
+
+  // Build the styled text by concatenating segments
+  let styledText = '';
+  for (const segment of segments) {
+    let segmentText = segment.text;
+    // Apply bold if specified
+    if (segment.bold) {
+      segmentText = `${colors.bold}${segmentText}`;
+    }
+    // Apply color if specified
+    if (segment.color) {
+      segmentText = `${colors[segment.color]}${segmentText}${colors.reset}`;
+    }
+    // Reset bold if it was applied
+    if (segment.bold) {
+      segmentText = `${segmentText}${colors.reset}`;
+    }
+    styledText += segmentText;
   }
+
+  // Draw the styled text
+  process.stdout.write(`\x1b[${y};${x}H${styledText}`);
+  // Draw the full-width line underneath
+  process.stdout.write(`\x1b[${y + 1};${x}H${line}`);
 }
 
 export async function selectOption<T>(
@@ -136,7 +165,6 @@ export async function selectOption<T>(
   getName: (option: T) => string,
   display: (option: T, input: string) => string,
   history: string[],
-  promptMessage: string = 'Select an option:',
   maxDisplay: number = 10,
   maxSelections?: number, // Optional limit on number of selections
 ): Promise<T[]> {
@@ -150,22 +178,42 @@ export async function selectOption<T>(
       const rows = process.stdout.rows || 24;
       const cols = process.stdout.columns || 80;
       const historyLines = Math.min(5, history.length);
-      const optionsStart = historyLines + 3;
+      const paddingTop = 2; // Padding from the top
+      const paddingLeft = 2; // Padding from the left
+      const instructionsStart = paddingTop; // Start with padding from the top
+      const optionsStart =
+        instructionsStart + historyLines + (errorMessage ? 2 : 0); // Adjust for history and error
+      const optionsDisplayStart = optionsStart + 2; // After header
 
-      // Clear screen
-      stdout.write('\x1b[2J\x1b[1;1H');
+      // Clear screen, reset scroll region, and move cursor to top-left
+      stdout.write('\x1b[2J\x1b[?1049h\x1b[H\x1b[0;0r');
 
-      // Display history
+      // Display history with padding
       for (let i = 0; i < historyLines; i++) {
         const line = history[history.length - historyLines + i] || '';
-        stdout.write(`\x1b[${i + 1};1H\x1b[K${line.slice(0, cols - 1)}`);
+        stdout.write(
+          `\x1b[${instructionsStart + i};${paddingLeft}H\x1b[K${line.slice(0, cols - paddingLeft - 1)}`,
+        );
       }
 
-      // Header
-      stdout.write(
-        `\x1b[${historyLines + 1};1H${colors.bold}Available Options (${selectedOptions.length}/${options.length})${colors.reset}`,
-      );
-      stdout.write(`\x1b[${historyLines + 2};1H${'─'.repeat(cols - 1)}`);
+      // Error message (if any) with padding
+      if (errorMessage) {
+        drawLine(paddingLeft, instructionsStart + historyLines, [
+          { text: errorMessage, color: 'red' },
+        ]);
+      }
+
+      // Header for options with shortcuts, with padding
+      drawLine(paddingLeft, optionsStart, [
+        {
+          text: `Available Options (${selectedOptions.length}/${options.length})`,
+          bold: true,
+        },
+        { text: '  ' }, // Spacer
+        { text: '[space: select]', color: 'yellow', bold: true },
+        { text: '  ' }, // Spacer
+        { text: '[enter: confirm]', color: 'yellow', bold: true },
+      ]);
 
       // Sort selected options alphabetically
       const sortedSelected = [...selectedOptions].sort((a, b) => {
@@ -174,7 +222,7 @@ export async function selectOption<T>(
         return aName < bName ? -1 : aName > bName ? 1 : 0;
       });
 
-      // Filter and sort unselected options
+      // Filter and sort unselected options, including numbers in search
       const lowerInput = currentInput.toLowerCase();
       const sortedUnselected = availableOptions
         .filter((opt) => !selectedOptions.includes(opt))
@@ -192,46 +240,39 @@ export async function selectOption<T>(
         maxDisplay,
       );
 
-      // Display options
+      // Display options with numbering and padding
       displayOptions.forEach((opt, index) => {
-        let displayText = display(opt, currentInput);
-        if (selectedOptions.includes(opt)) {
-          displayText = `${colors.green}${displayText}${colors.reset}`;
-        }
+        const optionNumber = (availableOptions.indexOf(opt) + 1).toString();
+        const displayText = display(opt, currentInput);
+        const numberedText = `${optionNumber.padStart(2, ' ')}. ${displayText}`;
+        const searchText = `${optionNumber} ${displayText.toLowerCase()}`; // Include number in search
+        // Highlight if selected
+        const finalText = selectedOptions.includes(opt)
+          ? `${colors.green}${numberedText}${colors.reset}`
+          : numberedText;
+        // Apply highlighting for search matches (if needed)
+        const isMatch = searchText.includes(lowerInput);
+        const outputText =
+          isMatch && lowerInput
+            ? `${colors.cyan}${finalText}${colors.reset}`
+            : finalText;
         stdout.write(
-          `\x1b[${optionsStart + index};1H\x1b[K${displayText.slice(0, cols - 1)}`,
+          `\x1b[${optionsDisplayStart + index};${paddingLeft}H\x1b[K${outputText.slice(0, cols - paddingLeft - 1)}`,
         );
       });
 
-      // Instruction box
-      const instructionWidth = cols - 4;
-      const instructionHeight = 5;
-      const instructionY = rows - 8;
-      drawBox(
-        2,
-        instructionY,
-        instructionWidth,
-        instructionHeight,
-        'Instructions',
-      );
-      const instructions = [
-        promptMessage,
-        'Type to filter, Space to select, Enter to confirm',
-        errorMessage ? `${colors.red}${errorMessage}${colors.reset}` : '',
-      ].filter(Boolean); // Remove empty error message
-      instructions.forEach((line, index) => {
-        const padding = Math.floor((instructionWidth - 2 - line.length) / 2);
-        stdout.write(`\x1b[${instructionY + 1 + index};3H${line}`);
-      });
-
-      // Input box at bottom
-      const inputBoxWidth = cols - 2;
-      const inputBoxHeight = 3;
-      const inputBoxY = rows - inputBoxHeight;
-      drawBox(1, inputBoxY, inputBoxWidth, inputBoxHeight);
-      stdout.write(
-        `\x1b[${inputBoxY + 1};2H${colors.green}> ${currentInput}${colors.reset}`,
-      );
+      // Input box at the very bottom with padding
+      const inputBoxWidth = cols - 2 * paddingLeft;
+      const inputBoxHeight = 3; // Increased height to 5 lines
+      const inputBoxY = rows - 2; // Ensure it's at the very bottom
+      drawBox(paddingLeft, inputBoxY, inputBoxWidth, inputBoxHeight);
+      // Draw the input prompt and current input, centered vertically in the taller box
+      const inputPrompt = `${colors.green}> ${currentInput}${colors.reset}`;
+      const inputPromptY = inputBoxY + Math.floor(inputBoxHeight / 2); // Center vertically
+      stdout.write(`\x1b[${inputPromptY};${paddingLeft + 1}H${inputPrompt}`);
+      // Move the cursor to the end of the current input and show it
+      const cursorX = paddingLeft + 1 + 2 + currentInput.length; // paddingLeft + 1 for box border, 2 for "> ", then input length
+      stdout.write(`\x1b[${inputPromptY};${cursorX}H\x1b[?25h`);
     }
 
     render();
@@ -247,9 +288,12 @@ export async function selectOption<T>(
         cleanupAndExit([]);
       } else if (char === ' ') {
         // Space: toggle selection of first match
-        const matches = availableOptions.filter((opt) =>
-          getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
-        );
+        const matches = availableOptions.filter((opt, idx) => {
+          const optionNumber = (idx + 1).toString();
+          const name = getName(opt).toLowerCase();
+          const searchText = `${optionNumber} ${name}`;
+          return searchText.includes(currentInput.toLowerCase());
+        });
         if (matches.length > 0) {
           const selected = matches[0];
           // Only allow selection if under maxSelections limit (if defined)
@@ -269,9 +313,12 @@ export async function selectOption<T>(
       } else if (char === '\r') {
         // Enter: select partially typed option (if any) and confirm
         if (currentInput) {
-          const matches = availableOptions.filter((opt) =>
-            getName(opt).toLowerCase().includes(currentInput.toLowerCase()),
-          );
+          const matches = availableOptions.filter((opt, idx) => {
+            const optionNumber = (idx + 1).toString();
+            const name = getName(opt).toLowerCase();
+            const searchText = `${optionNumber} ${name}`;
+            return searchText.includes(currentInput.toLowerCase());
+          });
           if (matches.length > 0) {
             const selected = matches[0];
             if (
@@ -304,6 +351,8 @@ export async function selectOption<T>(
     };
 
     function cleanupAndExit(result: T[]) {
+      // Reset terminal state before exiting
+      stdout.write('\x1b[?1049l\x1b[?25h');
       stdin.setRawMode(false);
       stdin.removeListener('data', onData);
       stdout.write('\n');

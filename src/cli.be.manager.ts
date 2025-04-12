@@ -114,61 +114,18 @@ export function createFlowManager(): FlowManager {
         return `${name} - ${flow.description}`;
       },
       terminalHistory,
-      'Select flows (type to filter, Space to select, Enter to execute):',
     );
     return selectedFlows
       .map((flow) => flow.name)
       .filter((name) => name !== '[Execute Selected Flows]');
   }
 
-  // --- Initial Welcome Screen ---
 
-  async function displayWelcomeScreen(): Promise<void> {
-    console.clear();
-    const cols = process.stdout.columns || 80;
-    const width = Math.min(60, cols - 4);
-    const height = 9;
-    const x = Math.floor((cols - width) / 2);
-    const y =
-      Math.floor((process.stdout.rows || 24) / 2) - Math.floor(height / 2);
-
-    // Draw a box around the welcome message
-    drawBox(
-      x,
-      y,
-      width,
-      height,
-      `${colors.cyan}${colors.bold}Welcome to CLI Flow Manager${colors.reset}`,
-    );
-
-    const messages = [
-      'This tool lets you select and execute flows.',
-      'Tasks include file selection and text processing.',
-      'Press any key to start...',
-    ];
-    messages.forEach((msg, index) => {
-      const padding = Math.floor((width - 2 - msg.length) / 2);
-      const paddedMsg = ' '.repeat(Math.max(0, padding)) + msg;
-      process.stdout.write(
-        `\x1b[${y + 2 + index};${x + 1}H${colors.green}${paddedMsg}${colors.reset}`,
-      );
-    });
-
-    await new Promise<void>((resolve) => {
-      stdin.setRawMode(true);
-      stdin.resume();
-      stdin.once('data', () => {
-        stdin.setRawMode(false);
-        resolve();
-      });
-    });
-  }
 
   // --- Main Loop ---
 
   /** Runs the main interactive loop of the flow manager */
   async function runMainLoop(): Promise<void> {
-    await displayWelcomeScreen();
 
     while (true) {
       const selectedFlowNames = await selectFlows();

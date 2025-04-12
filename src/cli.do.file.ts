@@ -62,7 +62,6 @@ export function createFileSelectionFlow(): Flow {
         return name;
       },
       [], // No history for file selection
-      'Select files:',
       50,
     );
 
