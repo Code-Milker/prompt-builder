@@ -220,10 +220,9 @@ export async function selectOption<T>(
                 : type === 'selectAll'
                   ? 'select all'
                   : 'unselect all';
-        const color =
-          index === currentSelectionTypeIndex ? colors.green : colors.gray;
+        const color = index === currentSelectionTypeIndex ? '' : colors.gray; // No color for selected, gray for non-selected
         const bold = index === currentSelectionTypeIndex ? colors.bold : '';
-        enterConfirmText += `${color}${bold}${displayText}${colors.reset}${index < selectionTypes.length - 1 ? ' | ' : ''}`;
+        enterConfirmText += `${color}${bold}${displayText}${index === currentSelectionTypeIndex ? colors.reset : colors.reset}${index < selectionTypes.length - 1 ? ' | ' : ''}`;
       });
       stdout.write(
         `\x1b[${enterConfirmLine};${indent}H\x1b[K${enterConfirmText}`,
