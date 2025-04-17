@@ -1,6 +1,16 @@
 [
   {
+    "ip": "192.168.1.18",
+    "device": "unknown",
+    "sku": "H6022"
+  },
+  {
     "ip": "192.168.1.17",
+    "device": "unknown",
+    "sku": "H607C"
+  },
+  {
+    "ip": "192.168.1.43",
     "device": "unknown",
     "sku": "H607C"
   },
@@ -8,15 +18,5 @@
     "ip": "192.168.1.112",
     "device": "unknown",
     "sku": "H6042"
-  },
-  {
-    "ip": "192.168.1.18",
-    "device": "unknown",
-    "sku": "H6022"
-  },
-  {
-    "ip": "192.168.1.43",
-    "device": "unknown",
-    "sku": "H607C"
   }
 ]
