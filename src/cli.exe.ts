@@ -4,7 +4,7 @@ import { createFlowManager } from './cli.be.manager';
 import { createFileSelectionFlow } from './cli.do.file';
 import { createLightControlFlow } from './cli.do.light';
 import { createTextProcessingFlow } from './cli.do.text';
-import { createLLMAgentFlow } from './cli.be.llm'; // Add this import
+import { createLLMAgentFlow } from './llm/llm'; // Add this import
 
 async function main() {
   const flowManager = createFlowManager();

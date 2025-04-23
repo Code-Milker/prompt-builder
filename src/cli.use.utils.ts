@@ -1,11 +1,12 @@
 // utils.ts - Shared utility functions for CLI flows
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import fs from 'fs';
 import { createInterface } from 'node:readline';
 import Bun from 'bun';
 import { stdin, stdout } from 'node:process';
 import type { Colors } from './cli.use.types';
-
+import path from 'path';
 // Promisify exec for async/await
 export const executivePromise = promisify(exec);
 
@@ -525,4 +526,34 @@ export async function selectOption<T>(
 
     stdin.on('data', onData);
   });
+}
+
+export async function listDirectories(
+  rootDir: string,
+  maxDepth: number = 3,
+): Promise<string[]> {
+  const directories: string[] = [];
+  const walkDir = async (currentDir: string, depth: number) => {
+    if (depth > maxDepth) return;
+    try {
+      const entries = await fs.promises.readdir(currentDir, {
+        withFileTypes: true,
+      });
+      directories.push(currentDir); // Include the current directory
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          if (!['.git', 'node_modules', 'dist', 'build'].includes(entry.name)) {
+            await walkDir(fullPath, depth + 1);
+          }
+        }
+      }
+    } catch (error) {
+      console.log(
+        `${colors.red}Error accessing directory ${currentDir}: ${error}${colors.reset}`,
+      );
+    }
+  };
+  await walkDir(rootDir, 0);
+  return directories;
 }

@@ -16,5 +16,8 @@
     "singleQuote": true,
     "trailingComma": "all",
     "proseWrap": "always"
+  },
+  "dependencies": {
+    "tesseract.js": "^6.0.1"
   }
 }

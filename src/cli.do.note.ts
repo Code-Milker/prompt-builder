@@ -1,12 +1,45 @@
 #!/usr/bin/env bun
 import { $ } from 'bun';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 // Configurable constants
 const WINDOW_TITLE = 'lester';
-const WINDOW_WIDTH_RATIO = 1 / 3;
+// const WINDOW_WIDTH_RATIO = 1 / 3;
 const WINDOW_HEIGHT_RATIO = 1 / 5;
+const COLLAPSED_HEIGHT = 50;
 const GHOSTTY_PATH = '/opt/homebrew/bin/nvim';
 const HAMMERSPOON_PATH = '/opt/homebrew/bin/hs';
+const STATE_FILE = path.join(os.homedir(), '.lester_window_state.json');
+
+// Window state management
+interface WindowState {
+  expanded: boolean;
+}
+
+function getWindowState(): WindowState {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      const data = fs.readFileSync(STATE_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading state file:', error);
+  }
+  return { expanded: true }; // Default state
+}
+
+function toggleWindowState() {
+  const state = getWindowState();
+  state.expanded = !state.expanded;
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state), 'utf8');
+  return state;
+}
+
+function saveWindowState(state: WindowState) {
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state), 'utf8');
+}
 
 async function findWindowId(title: string): Promise<string | null> {
   const windowList = await $`aerospace list-windows --all`.text();
@@ -60,10 +93,21 @@ async function setupWindowLayout(windowId: string) {
   await $`aerospace layout --window-id ${windowId} floating`.quiet();
 }
 
-async function positionFullWidthWindow() {
+async function positionWindow(toggleHeight: boolean = false) {
   const { width: screenWidth, height: screenHeight } =
     await getScreenDimensions();
-  const windowHeight = Math.round(screenHeight * WINDOW_HEIGHT_RATIO);
+
+  // Get or toggle window state
+  let state = getWindowState();
+  if (toggleHeight) {
+    state = toggleWindowState();
+  }
+
+  // Calculate height based on state
+  const windowHeight = state.expanded
+    ? Math.round(screenHeight * WINDOW_HEIGHT_RATIO)
+    : COLLAPSED_HEIGHT;
+
   const luaCode = `
     local win = hs.window.find("${WINDOW_TITLE}")
     if win then
@@ -79,22 +123,60 @@ async function positionFullWidthWindow() {
   await executeHammerspoonLua(luaCode);
 }
 
-async function openWorkoutNote() {
+async function openWorkoutNote(toggleHeight: boolean = false) {
   try {
     const { width, height } = await getScreenDimensions();
     console.log(`Screen size: ${width}x${height}`);
     const existingWindowId = await findWindowId(WINDOW_TITLE);
+
     if (existingWindowId) {
-      console.log(
-        `Moving existing window ID: ${existingWindowId} to current workspace`,
-      );
-      await moveToCurrentWorkspace(existingWindowId);
-      await positionFullWidthWindow();
+      // Get the current workspace
+      const currentWorkspaceOutput =
+        await $`aerospace list-workspaces --focused`.text();
+      const currentWorkspace = currentWorkspaceOutput.trim();
+
+      if (!currentWorkspace)
+        throw new Error('Failed to determine current workspace');
+
+      // Get the workspace of the existing window
+      const windowWorkspaceOutput =
+        await $`aerospace list-windows --all | grep ${existingWindowId}`.text();
+      console.log(windowWorkspaceOutput);
+      console.log(currentWorkspace);
+      console.log(existingWindowId);
+      const windowWorkspace = windowWorkspaceOutput
+        .split('|')
+        .map((s) => s.trim())[1]; // Assuming workspace is the second column
+
+      if (windowWorkspace === currentWorkspace) {
+        console.log(
+          `Window ID ${existingWindowId} is already on the current workspace (${currentWorkspace}). Hiding it.`,
+        );
+        // Hide the window using Hammerspoon
+        const hideLuaCode = `
+          local win = hs.window.find("${WINDOW_TITLE}")
+          if win then
+            win:close()
+          end
+        `;
+        await executeHammerspoonLua(hideLuaCode);
+        return; // Exit the function after hiding
+      } else {
+        console.log(
+          `Moving existing window ID: ${existingWindowId} to current workspace`,
+        );
+        await moveToCurrentWorkspace(existingWindowId);
+        await positionWindow(toggleHeight);
+      }
     } else {
       await createNewWindow();
       const windowId = await findWindowId(WINDOW_TITLE);
       if (!windowId) throw new Error('Window not found after creation');
-      await positionFullWidthWindow();
+      // Always show expanded for new windows
+      if (!getWindowState().expanded) {
+        toggleWindowState();
+      }
+      await positionWindow(false);
       await setupWindowLayout(windowId);
     }
     console.log('Window setup completed successfully');
@@ -104,4 +186,7 @@ async function openWorkoutNote() {
   }
 }
 
-openWorkoutNote();
+// Check if --toggle flag is provided
+const toggleHeight = process.argv.includes('--toggle');
+
+openWorkoutNote(toggleHeight);

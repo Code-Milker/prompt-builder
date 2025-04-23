@@ -1,13 +1,6 @@
 // cli.be.manager.ts - Flow manager implementation
-
 import type { Flow, FlowContext, FlowInput, FlowOutput } from './cli.use.types';
-import {
-  colors,
-  selectOption,
-  drawBox,
-  copyToSystemClipboard,
-} from './cli.use.utils';
-import { stdin } from 'node:process';
+import { colors, selectOption, copyToSystemClipboard } from './cli.use.utils';
 import * as readline from 'node:readline';
 
 /** Interface defining the FlowManager's methods */
@@ -90,13 +83,7 @@ export function createFlowManager(): FlowManager {
 
   /** Allows interactive selection of flows with enhanced UI */
   async function selectFlows(): Promise<string[]> {
-    const allFlows = getAvailableFlows()
-      .map((name) => flows[name])
-      .concat({
-        name: '[Execute Selected Flows]',
-        description: 'Run all selected flows',
-        execute: async () => Promise.resolve(null),
-      });
+    const allFlows = getAvailableFlows().map((name) => flows[name]);
     const selectedFlows = await selectOption(
       allFlows,
       (flow) => flow.name,
@@ -120,13 +107,10 @@ export function createFlowManager(): FlowManager {
       .filter((name) => name !== '[Execute Selected Flows]');
   }
 
-
-
   // --- Main Loop ---
 
   /** Runs the main interactive loop of the flow manager */
   async function runMainLoop(): Promise<void> {
-
     while (true) {
       const selectedFlowNames = await selectFlows();
       if (selectedFlowNames.length === 0) {
@@ -148,22 +132,7 @@ export function createFlowManager(): FlowManager {
             `\n${colors.green}Flow completed successfully.${colors.reset}`,
           );
 
-          // Ask if user wants to copy output to system clipboard
-          if (context.clipboard) {
-            const copyChoice = await promptUser(
-              'Copy output to system clipboard? (y/n): ',
-            );
-            if (copyChoice.toLowerCase() === 'y') {
-              if (typeof context.clipboard === 'string') {
-                await copyToSystemClipboard(context.clipboard);
-              } else {
-                await copyToSystemClipboard(
-                  JSON.stringify(context.clipboard, null, 2),
-                );
-              }
-              console.log('Output copied to clipboard.');
-            }
-          }
+          await copyToSystemClipboard(context.clipboard);
         } catch (error) {
           terminalHistory.push(`Error: ${error.message}`);
           console.error(
@@ -173,13 +142,13 @@ export function createFlowManager(): FlowManager {
       }
 
       // Prompt to continue or exit
-      const continueChoice = await promptUser(
-        'Continue selecting flows? (y/n): ',
-      );
-      if (continueChoice.toLowerCase() !== 'y') {
-        console.log('Exiting...');
-        break;
-      }
+      // const continueChoice = await promptUser(
+      //   'Continue selecting flows? (y/n): ',
+      // );
+      // if (continueChoice.toLowerCase() !== 'y') {
+      console.log('Exiting...');
+      break;
+      // }
     }
   }
 
