@@ -159,7 +159,7 @@ export async function selectOption<T>(
   getName: (option: T) => string,
   display: (option: T, input: string) => string,
   history: string[],
-  maxDisplay: number = 10,
+  maxDisplay: number = 20,
   maxSelections?: number, // Optional limit on number of selections
 ): Promise<T[]> {
   return new Promise((resolve) => {

@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { logMessage, getLatestAction } from './dialog';
 import type { PromptBuilder } from './prompts';
+import { sendToOllama } from './ollama';
+import { sendToGroq } from './groq';
 
 const textFileExtensions = [
   '.ts',
@@ -33,26 +35,6 @@ const textFileExtensions = [
   '.env',
   '.log',
 ];
-
-async function sendToOllama(
-  messages: Array<{ role: string; content: string }>,
-  model: string = 'deepseek-r1', // Consistent with DeepSeek R-1, 8-bit for M1
-): Promise<string> {
-  try {
-    const payload = { model, messages, stream: false };
-    console.log('Sending to Ollama:', messages);
-    const response = await fetch('http://localhost:11434/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    const data = await response.json();
-    return data.message.content;
-  } catch (error) {
-    throw new Error(`Failed to communicate with Ollama: ${error.message}`);
-  }
-}
 
 async function readFilesInDirectory(
   dir: string,
@@ -150,6 +132,8 @@ export async function generateResponse(
       userQuestion: contextData.userQuestion || '',
     },
   });
-  const response = await sendToOllama(messages);
+  const response = await sendToGroq(messages);
+  console.log(response);
+  // const response = await sendToOllama(messages);
   return response;
 }

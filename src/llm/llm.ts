@@ -1,5 +1,4 @@
-import {
-  selectDirectory, getUserQuestion } from './user';
+import { selectDirectory, getUserQuestion } from './user';
 import { fetchContext, generateResponse } from './agent';
 import path from 'path';
 import type { Flow } from '../cli.use.types';
@@ -65,7 +64,6 @@ export function createLLMAgentFlow(): Flow {
       files: relativePaths,
       files_content: context,
     });
-    console.log('Logged fetch_files:', relativePaths);
 
     // Add file context
     const fetchFilesAction = getLatestAction(logFile, 'fetch_files');

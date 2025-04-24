@@ -176,7 +176,7 @@ export function createFileSelectionFlow(): Flow {
         return name;
       },
       [],
-      10,
+      20,
       1, // Allow only one selection
     );
 

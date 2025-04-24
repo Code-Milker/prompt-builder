@@ -1,6 +1,7 @@
 import { promptUser, selectOption } from '../cli.use.utils';
 import fs from 'fs';
 import path from 'path';
+import { selectOption2 } from '../select-options';
 
 // Prompt user for a question or command
 export async function getUserQuestion(): Promise<string | null> {
@@ -14,10 +15,11 @@ export async function getUserQuestion(): Promise<string | null> {
   return userInput;
 }
 
-// Let user select a directory from ~/Projects
+// Let user select a directory from ~/Projects, then select files within that directory
 export async function selectDirectory(
   projectsDir: string,
-): Promise<string | null> {
+  state?: { 'Projects Directory'?: string; selections?: string[] },
+): Promise<string[]> {
   let directories: string[] = [];
   try {
     const entries = await fs.promises.readdir(projectsDir, {
@@ -33,30 +35,83 @@ export async function selectDirectory(
       )
       .map((entry) => path.join(projectsDir, entry.name));
   } catch (error) {
-    return null; // Error handling delegated to caller
+    return [];
   }
 
-  if (directories.length === 0) return null;
+  if (directories.length === 0) {
+    return [];
+  }
 
-  const selectedDirs = await selectOption<string>(
-    directories,
-    (dir) => path.basename(dir),
-    (dir, input) => {
-      const name = path.basename(dir);
-      const lowerInput = input.toLowerCase();
-      if (lowerInput && name.toLowerCase().includes(lowerInput)) {
-        const index = name.toLowerCase().indexOf(lowerInput);
-        const before = name.slice(0, index);
-        const match = name.slice(index, index + input.length);
-        const after = name.slice(index + input.length);
-        return `${before}${match}${after} (${dir})`;
+  // First call: Select a directory
+  const initialState = state || {
+    'Projects Directory': projectsDir,
+    selections: [],
+  };
+  const dirState = await selectOption2({
+    options: directories,
+    getName: (dir) => path.basename(dir),
+    history: ['Select one directory and press Enter to confirm.'],
+    state: initialState,
+    maxSelections: 1,
+  });
+
+  if (dirState.selections.length === 0) {
+    return [];
+  }
+
+  const selectedDir = dirState.selections[0];
+
+  // Recursively fetch files from the selected directory and its subdirectories
+  const blacklistedDirs = new Set([
+    'node_modules',
+    '.git',
+    '.DS_Store',
+    'logs',
+  ]);
+  async function getFilesRecursively(dir: string): Promise<string[]> {
+    let files: string[] = [];
+    try {
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isFile() && !entry.name.startsWith('.')) {
+          files.push(fullPath);
+        } else if (
+          entry.isDirectory() &&
+          !entry.name.startsWith('.') &&
+          !blacklistedDirs.has(entry.name)
+        ) {
+          const subFiles = await getFilesRecursively(fullPath);
+          files = files.concat(subFiles);
+        }
       }
-      return `${name} (${dir})`;
-    },
-    [],
-    10,
-    1,
-  );
+    } catch (error) {
+      // Ignore errors for individual directories (e.g., permission denied)
+    }
+    return files;
+  }
 
-  return selectedDirs.length > 0 ? selectedDirs[0] : null;
+  const files = await getFilesRecursively(selectedDir);
+  if (files.length === 0) {
+    return [];
+  }
+
+  // Second call: Select files from the directory
+  const fileState = await selectOption2({
+    options: files,
+    getName: (file) => path.relative(selectedDir, file), // Include subdirectory path in name
+    history: [
+      'Select files from the directory (use Tab to change selection mode, Enter to confirm).',
+    ],
+    state: {
+      'Selected Directory': selectedDir,
+      selections: [],
+    },
+    maxSelections: 10, // Set a maxSelections to enable auto-completion
+  });
+
+  // Log the final state for debugging
+  console.log(fileState);
+
+  return fileState.selections as string[];
 }
