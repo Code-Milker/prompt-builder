@@ -1,7 +1,7 @@
 // textProcessingFlow.ts - Text processing flow implementation
 
-import type { Flow } from './cli.use.types';
-import { printColored, promptUser, promptForNumber } from './cli.use.utils';
+import type { Flow } from '../types';
+import { printColored, promptUser, promptForNumber } from '../utils';
 
 export function createTextProcessingFlow(): Flow {
   async function execute(input?: any): Promise<any> {

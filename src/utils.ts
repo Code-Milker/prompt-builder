@@ -5,7 +5,7 @@ import fs from 'fs';
 import { createInterface } from 'node:readline';
 import Bun from 'bun';
 import { stdin, stdout } from 'node:process';
-import type { Colors } from './cli.use.types';
+import type { Colors } from './types';
 import path from 'path';
 // Promisify exec for async/await
 export const executivePromise = promisify(exec);

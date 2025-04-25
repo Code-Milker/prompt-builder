@@ -1,5 +1,5 @@
 import { stdin, stdout } from 'process';
-import { colors } from './cli.use.utils';
+import { colors } from '../utils';
 import path from 'path';
 
 interface SelectOptionParams<T, S extends Record<string, any>> {

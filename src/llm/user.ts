@@ -1,7 +1,7 @@
-import { promptUser, selectOption } from '../cli.use.utils';
+import { promptUser, selectOption } from '../utils';
 import fs from 'fs';
 import path from 'path';
-import { selectOption2 } from '../select-options';
+import { selectOption2 } from '../archive/select-options';
 import { selectOption3 } from '../dialectiq/index';
 // import { selectOption3 } from '../dialectiq/index';
 

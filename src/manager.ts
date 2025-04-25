@@ -1,6 +1,6 @@
 // cli.be.manager.ts - Flow manager implementation
-import type { Flow, FlowContext, FlowInput, FlowOutput } from './cli.use.types';
-import { colors, selectOption, copyToSystemClipboard } from './cli.use.utils';
+import type { Flow, FlowContext, FlowInput, FlowOutput } from './types';
+import { colors, selectOption, copyToSystemClipboard } from './utils';
 import * as readline from 'node:readline';
 
 /** Interface defining the FlowManager's methods */

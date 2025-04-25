@@ -1,12 +1,12 @@
 // src/cli.do.lights.ts - Local Govee lights control flow
 
-import type { Flow } from './cli.use.types';
+import type { Flow } from '../types';
 import {
   colors,
   promptUser,
   promptForNumber,
   selectOption,
-} from './cli.use.utils';
+} from '../utils';
 import Bun from 'bun';
 import dgram from 'node:dgram';
 
@@ -153,7 +153,6 @@ export function createLightControlFlow(): Flow {
         (d) => `${d.sku} - ${d.ip}`,
         (d, input) => `${d.sku} - ${d.ip}`, // Simplify if no highlight needed
         [],
-        'Select lights (type to filter, Space to pick, Enter to confirm):',
       );
 
       if (selected.length === 0) {
@@ -214,7 +213,6 @@ export function createLightControlFlow(): Flow {
             (c) => c.name,
             (c) => c.name,
             [],
-            'Pick a color:',
           );
           if (colorPick.length > 0) {
             const color = colorPick[0].rgb;
@@ -230,7 +228,6 @@ export function createLightControlFlow(): Flow {
               (c) => c.name,
               (c) => c.name,
               [],
-              `Pick a color for ${d.sku}:`,
             );
             if (colorPick.length > 0) {
               await setDeviceColor(d.ip, colorPick[0].rgb);

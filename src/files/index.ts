@@ -8,8 +8,8 @@ import {
   promptForNumber,
   promptUser,
   selectOption,
-} from './cli.use.utils';
-import type { Flow } from './cli.use.types';
+} from '../utils';
+import type { Flow } from '../types';
 import os from 'os';
 
 export function createFileSelectionFlow(): Flow {

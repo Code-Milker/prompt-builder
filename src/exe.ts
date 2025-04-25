@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
-import { createFlowManager } from './cli.be.manager';
-import { createFileSelectionFlow } from './cli.do.file';
-import { createLightControlFlow } from './cli.do.light';
-import { createTextProcessingFlow } from './cli.do.text';
+import { createFlowManager } from './manager';
+import { createFileSelectionFlow } from './files';
+import { createLightControlFlow } from './lights';
+import { createTextProcessingFlow } from './text/text';
 import { createLLMAgentFlow } from './llm/llm'; // Add this import
 
 async function main() {

@@ -1,7 +1,7 @@
 import { selectDirectory, getUserQuestion } from './user';
 import { fetchContext, generateResponse } from './agent';
 import path from 'path';
-import type { Flow } from '../cli.use.types';
+import type { Flow } from '../types';
 import { initializeLogFile, logMessage, getLatestAction } from './dialog';
 import { buildPrompt } from './prompts';
 
@@ -57,7 +57,7 @@ export function createLLMAgentFlow(): Flow {
     });
     console.log('Logged select_directory:', selectedDir);
 
-    const context = await fetchContext(selectedDir);
+    const context = await fetchContext(selectedDir[0]);
     const relativePaths = Object.keys(context);
     logMessage('system', 'Fetched file contents', logFile, {
       action: 'fetch_files',
