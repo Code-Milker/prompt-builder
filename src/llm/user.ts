@@ -2,6 +2,8 @@ import { promptUser, selectOption } from '../cli.use.utils';
 import fs from 'fs';
 import path from 'path';
 import { selectOption2 } from '../select-options';
+import { selectOption3 } from '../dialectiq/index';
+// import { selectOption3 } from '../dialectiq/index';
 
 // Prompt user for a question or command
 export async function getUserQuestion(): Promise<string | null> {
@@ -47,7 +49,7 @@ export async function selectDirectory(
     'Projects Directory': projectsDir,
     selections: [],
   };
-  const dirState = await selectOption2({
+  const dirState = await selectOption3({
     options: directories,
     getName: (dir) => path.basename(dir),
     history: ['Select one directory and press Enter to confirm.'],
@@ -97,7 +99,7 @@ export async function selectDirectory(
   }
 
   // Second call: Select files from the directory
-  const fileState = await selectOption2({
+  const fileState = await selectOption3({
     options: files,
     getName: (file) => path.relative(selectedDir, file), // Include subdirectory path in name
     history: [
