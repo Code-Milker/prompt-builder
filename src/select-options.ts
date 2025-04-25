@@ -34,23 +34,21 @@ function defaultDisplay<T>({
   let nameIndex = 0;
   const matchIndices: number[] = [];
 
-  // Find the positions of each character in the fuzzy match
   for (const char of inputChars) {
     nameIndex = lowerName.indexOf(char, nameIndex);
-    if (nameIndex === -1) return name; // If any character doesn't match, return unhighlighted
+    if (nameIndex === -1) return name;
     matchIndices.push(nameIndex);
     nameIndex++;
   }
 
-  // Build the highlighted string by inserting color codes around matched characters
   let result = '';
   let lastIndex = 0;
   matchIndices.forEach((index) => {
-    result += name.slice(lastIndex, index); // Text before the match
-    result += `\x1b[36m${name[index]}\x1b[0m`; // Highlight the matched character
+    result += name.slice(lastIndex, index);
+    result += `\x1b[36m${name[index]}\x1b[0m`;
     lastIndex = index + 1;
   });
-  result += name.slice(lastIndex); // Text after the last match
+  result += name.slice(lastIndex);
 
   return result;
 }
@@ -164,20 +162,18 @@ function renderInterface<T>({
     getTerminalDimensions();
   const historyLines = Math.min(5, history.length);
 
-  // Calculate lines used by history, state, commands, and other UI elements
-  let stateLines = 1; // "State:" header
+  let stateLines = 1;
   Object.entries(state).forEach(([key, value]) => {
     if (key !== 'selections') {
       const lines = value.toString().split('\n');
       stateLines += lines.length;
     }
   });
-  const commandLines = 2; // "Commands:" header + commands line
-  const optionsHeaderLines = 1; // "Options (x/y)" line
-  const promptLines = 1; // Input prompt line
-  const spacingLines = 2; // Space between sections (e.g., between history and state, state and commands)
+  const commandLines = 2;
+  const optionsHeaderLines = 1;
+  const promptLines = 1;
+  const spacingLines = 2;
 
-  // Calculate remaining lines for options
   const usedLines =
     paddingTop +
     historyLines +
@@ -186,7 +182,7 @@ function renderInterface<T>({
     optionsHeaderLines +
     promptLines +
     spacingLines;
-  const remainingLines = Math.max(5, rows - usedLines); // Ensure at least 5 lines for options
+  const remainingLines = Math.max(5, rows - usedLines);
   const calculatedMaxDisplay = maxDisplay || remainingLines;
 
   let currentLine = paddingTop + historyLines + 1;
@@ -213,7 +209,7 @@ function renderInterface<T>({
     left: paddingLeft,
     indent,
   });
-  currentLine += commandLines + 1; // Adjust for commands and spacing
+  currentLine += commandLines + 1;
   renderAvailableOptions({
     selected: context.selectedOptions,
     available: context.availableOptions,
@@ -356,7 +352,6 @@ function handleEnter<T>({
   else if (type === 'unselectAll')
     unselectAllOptions({ context, updateState, render });
 
-  // Auto-complete if maxSelections is reached
   if (
     maxSelections !== null &&
     context.selectedOptions.length >= maxSelections
@@ -532,13 +527,12 @@ function findMatches<T>({
     const name = getName(opt).toLowerCase();
     let nameIndex = 0;
 
-    // Fuzzy match: Check if each character in the input can be found in sequence in the name
     for (const char of inputChars) {
       nameIndex = name.indexOf(char, nameIndex);
-      if (nameIndex === -1) return false; // Character not found, no match
-      nameIndex++; // Move to the next position after the found character
+      if (nameIndex === -1) return false;
+      nameIndex++;
     }
-    return true; // All characters matched in sequence
+    return true;
   });
 }
 
@@ -700,123 +694,107 @@ function renderAvailableOptions<T>({
     highlightColor = colors.red;
   }
 
-  // Step 1: Filter options based on input
-  let filteredOptions = available;
-  if (input) {
-    filteredOptions = findMatches({ input, options: available, getName });
-  }
-
-  // Step 2: Combine selected and unselected options
+  // Step 1: Filter options first
+  let filteredOptions = input
+    ? findMatches({ input, options: available, getName })
+    : available;
   const unselectedOptions = filteredOptions.filter(
     (opt) => !selected.includes(opt),
   );
   let totalOptionsToDisplay = [...selected, ...unselectedOptions];
-
-  // Step 3: Group options by subdirectory (or '.' for root-level files)
-  const optionsBySubdir: { [subdir: string]: T[] } = {};
-  totalOptionsToDisplay.forEach((opt) => {
-    const name = getName(opt);
-    const subdir = name.includes(path.sep) ? path.dirname(name) : '.'; // Use '.' for files in the root
-    if (!optionsBySubdir[subdir]) {
-      optionsBySubdir[subdir] = [];
-    }
-    optionsBySubdir[subdir].push(opt);
-  });
-
-  // Sort subdirectories alphabetically
-  const subdirs = Object.keys(optionsBySubdir).sort();
-
-  // Step 4: Limit to maxDisplay and distribute across subdirs
-  let displayOptions: T[] = [];
   const totalOptionsCount = totalOptionsToDisplay.length;
 
-  // If there are fewer options than maxDisplay, show all, but still group and sort
+  // Step 2: Group filtered options by top-level directory
+  const optionsByTopLevelDir: { [topLevelDir: string]: T[] } = {};
+  totalOptionsToDisplay.forEach((opt) => {
+    const name = getName(opt);
+    const topLevelDir = name.includes(path.sep) ? name.split(path.sep)[0] : '.';
+    if (!optionsByTopLevelDir[topLevelDir]) {
+      optionsByTopLevelDir[topLevelDir] = [];
+    }
+    optionsByTopLevelDir[topLevelDir].push(opt);
+  });
+
+  const topLevelDirs = Object.keys(optionsByTopLevelDir).sort();
+  let displayOptions: T[] = [];
+
   if (totalOptionsCount <= maxDisplay) {
-    subdirs.forEach((subdir) => {
-      optionsBySubdir[subdir].sort((a, b) =>
+    // Display all options if they fit
+    topLevelDirs.forEach((dir) => {
+      optionsByTopLevelDir[dir].sort((a, b) =>
         getName(a).localeCompare(getName(b)),
       );
-      displayOptions.push(...optionsBySubdir[subdir]);
+      displayOptions.push(...optionsByTopLevelDir[dir]);
     });
   } else {
-    // Distribute display slots across subdirectories
-    const minSlotsPerSubdir = 1;
-    let remainingSlots = maxDisplay - subdirs.length; // Reserve 1 slot per subdir
-    if (remainingSlots < 0) remainingSlots = 0;
+    const n = topLevelDirs.length;
+    if (n > 0) {
+      // Step 3: Calculate base slots per directory based on filtered directories
+      const baseSlots = Math.floor(maxDisplay / n);
+      let remainingSlots = maxDisplay % n;
+      const slotsByDir: { [dir: string]: number } = {};
 
-    // Calculate total files across all subdirs for proportional distribution
-    const totalFiles = subdirs.reduce(
-      (sum, subdir) => sum + optionsBySubdir[subdir].length,
-      0,
-    );
-    const slotsBySubdir: { [subdir: string]: number } = {};
-
-    // First pass: Assign minimum slots
-    subdirs.forEach((subdir) => {
-      slotsBySubdir[subdir] = Math.min(
-        minSlotsPerSubdir,
-        optionsBySubdir[subdir].length,
-      );
-    });
-
-    // Second pass: Distribute remaining slots proportionally
-    if (remainingSlots > 0) {
-      const totalRemainingFiles = subdirs.reduce(
-        (sum, subdir) =>
-          sum +
-          Math.max(0, optionsBySubdir[subdir].length - slotsBySubdir[subdir]),
-        0,
-      );
-      subdirs.forEach((subdir) => {
-        const additionalSlots =
-          totalRemainingFiles > 0
-            ? Math.floor(
-                (Math.max(
-                  0,
-                  optionsBySubdir[subdir].length - slotsBySubdir[subdir],
-                ) /
-                  totalRemainingFiles) *
-                  remainingSlots,
-              )
-            : 0;
-        slotsBySubdir[subdir] += additionalSlots;
+      // Initial allocation based on filtered file counts
+      topLevelDirs.forEach((dir) => {
+        const fileCount = optionsByTopLevelDir[dir].length;
+        slotsByDir[dir] = Math.min(baseSlots, fileCount);
       });
 
-      // Third pass: Distribute any leftover slots due to rounding
-      let allocatedSlots = subdirs.reduce(
-        (sum, subdir) => sum + slotsBySubdir[subdir],
+      // Step 4: Distribute remaining slots to directories with more files
+      let totalAssigned = topLevelDirs.reduce(
+        (sum, dir) => sum + slotsByDir[dir],
         0,
       );
-      let leftoverSlots = maxDisplay - allocatedSlots;
-      let idx = 0;
-      while (leftoverSlots > 0 && idx < subdirs.length) {
-        const subdir = subdirs[idx];
-        if (slotsBySubdir[subdir] < optionsBySubdir[subdir].length) {
-          slotsBySubdir[subdir]++;
-          leftoverSlots--;
+      remainingSlots = maxDisplay - totalAssigned;
+      let dirIndex = 0;
+      while (remainingSlots > 0 && dirIndex < topLevelDirs.length) {
+        const dir = topLevelDirs[dirIndex];
+        if (optionsByTopLevelDir[dir].length > slotsByDir[dir]) {
+          slotsByDir[dir]++;
+          remainingSlots--;
         }
-        idx++;
+        dirIndex = (dirIndex + 1) % topLevelDirs.length; // Cycle through dirs to distribute fairly
       }
+
+      // Step 5: Build display options with sorted files
+      displayOptions = [];
+      topLevelDirs.forEach((dir) => {
+        const dirOptions = optionsByTopLevelDir[dir]
+          .sort((a, b) => getName(a).localeCompare(getName(b)))
+          .slice(0, slotsByDir[dir]);
+        displayOptions.push(...dirOptions);
+      });
+
+      // Step 6: Fill any remaining space up to maxDisplay
+      let currentCount = displayOptions.length;
+      if (currentCount < maxDisplay) {
+        let slotsToFill = maxDisplay - currentCount;
+        dirIndex = 0;
+        while (slotsToFill > 0 && dirIndex < topLevelDirs.length) {
+          const dir = topLevelDirs[dirIndex];
+          const remainingFiles =
+            optionsByTopLevelDir[dir].length - slotsByDir[dir];
+          if (remainingFiles > 0) {
+            const toAdd = Math.min(remainingFiles, slotsToFill);
+            const extraOptions = optionsByTopLevelDir[dir]
+              .sort((a, b) => getName(a).localeCompare(getName(b)))
+              .slice(slotsByDir[dir], slotsByDir[dir] + toAdd);
+            displayOptions.push(...extraOptions);
+            slotsByDir[dir] += toAdd;
+            slotsToFill -= toAdd;
+          }
+          dirIndex++;
+        }
+      }
+
+      displayOptions = displayOptions.slice(0, maxDisplay);
     }
-
-    // Build displayOptions, sorting within each subdirectory
-    displayOptions = [];
-    subdirs.forEach((subdir) => {
-      const subdirOptions = optionsBySubdir[subdir]
-        .sort((a, b) => getName(a).localeCompare(getName(b))) // Sort within each subdir
-        .slice(0, slotsBySubdir[subdir]);
-      displayOptions.push(...subdirOptions);
-    });
-
-    // Ensure we don't exceed maxDisplay
-    displayOptions = displayOptions.slice(0, maxDisplay);
   }
 
   stdout.write(
     `\x1b[${start};${left}H\x1b[K${colors.cyan}${colors.bold}Options (${selected.length}/${available.length})${colors.reset}`,
   );
 
-  // Number options sequentially based on display order
   displayOptions.forEach((opt, idx) => {
     const num = (idx + 1).toString().padStart(2, ' ');
     const text = `${num}. ${display(opt, input)}`;
