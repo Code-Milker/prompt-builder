@@ -5,8 +5,15 @@ import { renderState } from './components/state';
 import { renderCommands } from './components/commands';
 import { renderAvailableOptions } from './components/options';
 import { renderInputPrompt } from './components/prompt';
+import { renderTransformations } from './components/transformations';
 import { findMatches, groupOptionsByDirectory } from '../core/matching';
-import type { SelectionContext } from '../types';
+import type {
+  SelectionContext,
+  TerminalDimensions,
+  Transformation,
+} from '../types';
+import { colors } from './utils';
+import { stdout } from 'bun';
 
 export function renderInterface<T>({
   context,
@@ -30,15 +37,19 @@ export function renderInterface<T>({
   const historyLines = Math.min(5, history.length);
   let stateLines = calculateStateLines(state);
   const commandLines = 2;
+  const transformationLines = calculateTransformationLines(
+    context.availableTransformations,
+  );
   const optionsHeaderLines = 1;
   const promptLines = 1;
-  const spacingLines = 2;
+  const spacingLines = 3; // Added extra space for transformations section
 
   const usedLines =
     paddingTop +
     historyLines +
     stateLines +
     commandLines +
+    transformationLines +
     optionsHeaderLines +
     promptLines +
     spacingLines;
@@ -78,6 +89,15 @@ export function renderInterface<T>({
 
   currentLine += commandLines + 1;
 
+  currentLine = renderTransformations({
+    activeTransformations: context.activeTransformations,
+    availableTransformations: context.availableTransformations,
+    startLine: currentLine,
+    dimensions,
+  });
+
+  currentLine += 1; // Add spacing
+
   renderAvailableOptions({
     context,
     displayOptions,
@@ -92,6 +112,19 @@ export function renderInterface<T>({
     input: context.currentInput,
     dimensions,
   });
+
+  // Render help text for transformations at the bottom
+  if (context.availableTransformations.length > 0) {
+    renderTransformationHelp(dimensions);
+  }
+}
+
+function renderTransformationHelp(dimensions: TerminalDimensions): void {
+  const { rows, paddingLeft } = dimensions;
+  const helpLine = rows - 2;
+  stdout.write(
+    `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}Type 't' + number to toggle a transformation${colors.reset}`,
+  );
 }
 
 function calculateStateLines(state: Record<string, any>): number {
@@ -102,6 +135,12 @@ function calculateStateLines(state: Record<string, any>): number {
     }
   });
   return lines;
+}
+
+function calculateTransformationLines(
+  transformations: Transformation[],
+): number {
+  return transformations.length === 0 ? 2 : transformations.length + 1;
 }
 
 function prepareDisplayOptions<T>({

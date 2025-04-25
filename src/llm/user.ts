@@ -1,9 +1,8 @@
 import { promptUser, selectOption } from '../utils';
-import fs from 'fs';
+import fs from 'fs'; // For synchronous fs.readFileSync
 import path from 'path';
-import { selectOption2 } from '../archive/select-options';
 import { selectOption3 } from '../dialectiq/index';
-// import { selectOption3 } from '../dialectiq/index';
+import type { SelectOptionReturn, Transformation } from '../dialectiq/types';
 
 // Prompt user for a question or command
 export async function getUserQuestion(): Promise<string | null> {
@@ -21,7 +20,7 @@ export async function getUserQuestion(): Promise<string | null> {
 export async function selectDirectory(
   projectsDir: string,
   state?: { 'Projects Directory'?: string; selections?: string[] },
-): Promise<string[]> {
+): Promise<SelectOptionReturn<string, Record<string, any>>> {
   let directories: string[] = [];
   try {
     const entries = await fs.promises.readdir(projectsDir, {
@@ -37,11 +36,21 @@ export async function selectDirectory(
       )
       .map((entry) => path.join(projectsDir, entry.name));
   } catch (error) {
-    return [];
+    return {
+      'Projects Directory': projectsDir,
+      selections: [],
+      Selected: 'None',
+      transformations: {},
+    };
   }
 
   if (directories.length === 0) {
-    return [];
+    return {
+      'Projects Directory': projectsDir,
+      selections: [],
+      Selected: 'None',
+      transformations: {},
+    };
   }
 
   // First call: Select a directory
@@ -58,7 +67,12 @@ export async function selectDirectory(
   });
 
   if (dirState.selections.length === 0) {
-    return [];
+    return {
+      'Projects Directory': projectsDir,
+      selections: [],
+      Selected: 'None',
+      transformations: {},
+    };
   }
 
   const selectedDir = dirState.selections[0];
@@ -95,13 +109,68 @@ export async function selectDirectory(
 
   const files = await getFilesRecursively(selectedDir);
   if (files.length === 0) {
-    return [];
+    return {
+      'Selected Directory': selectedDir,
+      selections: [],
+      Selected: 'None',
+      transformations: {},
+    };
   }
 
-  // Second call: Select files from the directory
+  const transformations: Transformation[] = [
+    {
+      name: 'uppercase',
+      description: 'Convert selected text to uppercase',
+      apply: <T>(selections: T[], getName: (option: T) => string) => {
+        return selections.map((s) => getName(s).toUpperCase());
+      },
+    },
+    {
+      name: 'fetch-content',
+      description: 'Get file content for selected files',
+      apply: <T>(selections: T[], getName: (option: T) => string) => {
+        const contents: Record<string, string> = {};
+        for (const selection of selections) {
+          const relativePath = getName(selection); // Relative path for key
+          const absolutePath = path.resolve(selectedDir, relativePath); // Absolute path for reading
+          try {
+            contents[relativePath] = fs.readFileSync(absolutePath, 'utf-8');
+          } catch (err) {
+            contents[relativePath] = `Error: ${(err as Error).message}`;
+          }
+        }
+        return contents;
+      },
+    },
+    {
+      name: 'extract-functions',
+      description: 'Extract function names from TypeScript files',
+      apply: async <T>(selections: T[], getName: (option: T) => string) => {
+        const results: Record<string, string[]> = {};
+        for (const selection of selections) {
+          const relativePath = getName(selection); // Relative path for key
+          if (path.extname(relativePath) === '.ts') {
+            const absolutePath = path.resolve(selectedDir, relativePath); // Absolute path for reading
+            try {
+              const content = await fs.promises.readFile(absolutePath, 'utf-8');
+              const functionMatches = content.match(/function\s+(\w+)/g) || [];
+              results[relativePath] = functionMatches.map((m) =>
+                m.replace('function ', ''),
+              );
+            } catch (err) {
+              results[relativePath] = [`Error: ${(err as Error).message}`];
+            }
+          }
+        }
+        return results;
+      },
+    },
+  ];
+
+  // Second call: Select files from the directory with transformations
   const fileState = await selectOption3({
     options: files,
-    getName: (file) => path.relative(selectedDir, file), // Include subdirectory path in name
+    getName: (file) => path.relative(selectedDir, file), // Relative paths for UI
     history: [
       'Select files from the directory (use Tab to change selection mode, Enter to confirm).',
     ],
@@ -109,11 +178,13 @@ export async function selectDirectory(
       'Selected Directory': selectedDir,
       selections: [],
     },
-    maxSelections: 10, // Set a maxSelections to enable auto-completion
+    maxSelections: 10,
+    transformations: transformations,
+    customCommands: ['customCommands'],
   });
 
   // Log the final state for debugging
   console.log(fileState);
 
-  return fileState.selections as string[];
+  return fileState; // Return full fileState object
 }

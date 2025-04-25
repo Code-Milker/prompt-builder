@@ -1,10 +1,9 @@
 // index.ts
 import { stdin } from 'process';
 import { initializeContext, updateSelectionState } from './core/context';
-import { setupTerminal, cleanupTerminal } from './terminal';
+import { setupTerminal, cleanupTerminal, handleInput } from './terminal';
 import { renderInterface } from './ui/renderer';
 import { defaultDisplay } from './core/matching';
-import { handleInput } from './terminal';
 import type { SelectOptionParams, SelectOptionReturn } from './types';
 
 export async function selectOption3<T, S extends Record<string, any>>({
@@ -15,6 +14,8 @@ export async function selectOption3<T, S extends Record<string, any>>({
   state,
   maxDisplay,
   maxSelections = null,
+  transformations = [],
+  customCommands = [],
 }: SelectOptionParams<T, S>): Promise<SelectOptionReturn<T, S>> {
   return new Promise((resolve) => {
     // Initialize
@@ -23,7 +24,12 @@ export async function selectOption3<T, S extends Record<string, any>>({
       ((option: T, input: string) =>
         defaultDisplay({ option, input, getName }));
 
-    const context = initializeContext({ options, state });
+    const context = initializeContext({
+      options,
+      state,
+      transformations,
+      customCommands,
+    });
 
     // Setup functions
     const updateState = () =>
@@ -43,7 +49,13 @@ export async function selectOption3<T, S extends Record<string, any>>({
         maxDisplay,
       });
 
-    const cleanup = () => cleanupTerminal({ resolve, state });
+    const cleanup = () =>
+      cleanupTerminal({
+        resolve,
+        state,
+        context,
+        getName,
+      });
 
     // Setup terminal and initial render
     setupTerminal();
