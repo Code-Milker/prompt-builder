@@ -18,6 +18,7 @@ export async function selectFilesRecursively(
   async function getFilesRecursively(dir: string): Promise<string[]> {
     let files: string[] = [];
     try {
+      console.log('Reading directory:', dir);
       const entries = await fs.promises.readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
@@ -33,7 +34,7 @@ export async function selectFilesRecursively(
         }
       }
     } catch (error) {
-      // Ignore errors for individual directories (e.g., permission denied)
+      console.error(`Error reading directory ${dir}:`, error.message);
     }
     return files;
   }
@@ -49,25 +50,37 @@ export async function selectFilesRecursively(
   }
 
   // Select files from the directory with transformations
-  const fileState = await selectOption3({
-    options: files,
-    getName: (file) => path.relative(projectsDir, file), // Relative paths for UI
-    history: [
-      'Select files from the directory (use Tab to change selection mode, Enter to confirm).',
-    ],
-    state: {
-      'Selected Directory': projectsDir,
-      selections: [],
-    },
-    maxSelections: 10,
-    transformations: transformations,
-    customCommands: ['customCommands'],
-  });
+  let fileState;
+  try {
+    fileState = await selectOption3({
+      options: files,
+      getName: (file) => path.relative(projectsDir, file), // Relative paths for UI
+      history: [
+        'Select files from the directory (use Tab to change selection mode, Enter to confirm).',
+      ],
+      state: {
+        'Selected Directory': projectsDir,
+        selections: [],
+      },
+      maxSelections: 10,
+      transformations: transformations,
+      customCommands: ['customCommands'],
+    });
+  } catch (error) {
+    console.error('Error in selectOption3:', error.message);
+    console.error('Stack trace:', error.stack);
+    throw error; // Re-throw to handle in outer catch
+  }
 
-  // Resolve all transformation promises
+  // Resolve all transformation promises with error handling
   const resolvedTransformations: Record<string, any> = {};
   for (const [name, result] of Object.entries(fileState.transformations)) {
-    resolvedTransformations[name] = await result; // Await Promise to get resolved value
+    try {
+      resolvedTransformations[name] = await result;
+    } catch (error) {
+      console.error(`Error in transformation "${name}":`, error.message);
+      resolvedTransformations[name] = `Error: ${error.message}`;
+    }
   }
 
   const resolvedFileState: SelectOptionReturn<string, Record<string, any>> = {
@@ -78,25 +91,37 @@ export async function selectFilesRecursively(
   return resolvedFileState; // Return full fileState with resolved transformations
 }
 
-const projectsDir = path.join(
-  process.env.HOME || process.env.USERPROFILE,
-  'Projects',
-);
+// Get project directory from command-line argument or fall back to ~/Projects
+const projectsDir =
+  process.argv[2] ||
+  path.join(process.env.HOME || process.env.USERPROFILE, 'Projects');
 
 // Ensure logs directory exists
-const projectRoot = path.resolve(__dirname, '../../..'); // From src/dialectiq/test to project root
-const logsDir = path.join(projectRoot, 'logs');
+const logsDir = path.join(
+  process.env.HOME || process.env.USERPROFILE,
+  'Projects/prompt-builder/logs',
+);
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
 // Write output to logs
+console.log('Starting script execution...');
 selectFilesRecursively(projectsDir)
   .then((response) => {
-    // Generate unique filename with timestamp
+    console.log('selectFilesRecursively completed');
+    // Generate timestamp for subdirectory
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const jsonLogFile = path.join(logsDir, `select-option-${timestamp}.json`);
-    const markdownLogFile = path.join(logsDir, `select-option-${timestamp}.md`);
+    const runLogDir = path.join(logsDir, timestamp);
+
+    // Create run-specific log directory
+    if (!fs.existsSync(runLogDir)) {
+      fs.mkdirSync(runLogDir, { recursive: true });
+    }
+
+    // File paths
+    const jsonLogFile = path.join(runLogDir, `select-option.json`);
+    const markdownLogFile = path.join(runLogDir, `prompt-context.md`);
 
     // Write full response as JSON
     fs.writeFileSync(jsonLogFile, JSON.stringify(response, null, 2), 'utf-8');
@@ -104,17 +129,25 @@ selectFilesRecursively(projectsDir)
 
     // Write to-markdown output if available
     if (response.transformations['to-markdown']) {
-      fs.writeFileSync(
-        markdownLogFile,
-        response.transformations['to-markdown'],
-        'utf-8',
-      );
-      console.log(`Wrote to-markdown output to ${markdownLogFile}`);
-      console.log(response.transformations['to-markdown']);
+      if (typeof response.transformations['to-markdown'] === 'string') {
+        fs.writeFileSync(
+          markdownLogFile,
+          response.transformations['to-markdown'],
+          'utf-8',
+        );
+        console.log(`Wrote to-markdown output to ${markdownLogFile}`);
+        console.log(response.transformations['to-markdown']);
+      } else {
+        console.error(
+          'to-markdown output is not a string:',
+          response.transformations['to-markdown'],
+        );
+      }
     } else {
       console.log('No to-markdown output available');
     }
   })
   .catch((error) => {
-    console.error('Error in selectFilesRecursively:', error);
+    console.error('Error in selectFilesRecursively:', error.message);
+    console.error('Stack trace:', error.stack);
   });
