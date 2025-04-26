@@ -37,7 +37,6 @@ export function createLLMAgentFlow(): Flow {
       ]);
     const logFile = initializeLogFile();
     logMessage('system', 'LLM Agent is ready.', logFile);
-    console.log('Log file initialized:', logFile);
 
     const projectsDir = path.join(
       process.env.HOME || process.env.USERPROFILE,

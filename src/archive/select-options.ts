@@ -472,16 +472,14 @@ function handleRangeSelection<T>({
 
 function selectAllOptions<T>({
   context,
-  availableOptions,
   updateState,
   render,
 }: {
-  context: ReturnType<typeof initializeContext>;
-  availableOptions: T[];
+  context: SelectionContext<T>;
   updateState: () => void;
   render: () => void;
-}) {
-  const { selectedOptions } = context;
+}): void {
+  const { selectedOptions, availableOptions } = context;
   availableOptions.forEach((opt) => {
     if (!selectedOptions.includes(opt)) {
       selectedOptions.push(opt);

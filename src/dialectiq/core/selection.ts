@@ -84,15 +84,22 @@ export function handleRangeSelection<T>({
 
 export function selectAllOptions<T>({
   context,
+  getName,
   updateState,
   render,
 }: {
   context: SelectionContext<T>;
+  getName: (option: T) => string;
   updateState: () => void;
   render: () => void;
 }): void {
-  const { selectedOptions, availableOptions } = context;
-  availableOptions.forEach((opt) => {
+  const { selectedOptions, availableOptions, currentInput } = context;
+  const matchingOptions = findMatches({
+    input: currentInput,
+    options: availableOptions,
+    getName,
+  });
+  matchingOptions.forEach((opt) => {
     if (!selectedOptions.includes(opt)) {
       selectedOptions.push(opt);
     }
@@ -156,6 +163,7 @@ export function handleSelectionByType<T>({
   } else if (type === 'selectAll') {
     selectAllOptions({
       context,
+      getName,
       updateState,
       render,
     });

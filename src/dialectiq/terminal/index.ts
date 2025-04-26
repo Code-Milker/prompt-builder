@@ -19,7 +19,7 @@ export function setupTerminal(): void {
   stdout.write('\x1b[?25l'); // Hide cursor initially
 }
 
-export function cleanupTerminal<T>({
+export async function cleanupTerminal<T>({
   resolve,
   state,
   context,
@@ -29,29 +29,27 @@ export function cleanupTerminal<T>({
   state: Record<string, any>;
   context: SelectionContext<T>;
   getName: (option: T) => string;
-}): void {
+}): Promise<void> {
   stdout.write('\x1b[?1049l'); // Return to main screen buffer
   stdout.write('\x1b[?25h'); // Show cursor
   stdin.setRawMode(false);
   stdin.removeAllListeners('data');
   stdout.write('\n');
 
-  // Apply transformations and include in result
+  // Apply transformations and await their results
   const transformationResults: Record<string, any> = {};
 
-  context.activeTransformations.forEach((transformName) => {
+  for (const transformName of context.activeTransformations) {
     const transformation = context.availableTransformations.find(
       (t) => t.name === transformName,
     );
     if (transformation) {
-      transformationResults[transformName] = transformation.apply(
-        context.selectedOptions,
-        getName,
-      );
+      const result = transformation.apply(context.selectedOptions, getName);
+      transformationResults[transformName] = await result; // Await the promise if it exists
     }
-  });
+  }
 
-  // Include transformation results in state
+  // Include resolved transformation results in state
   state.transformations = transformationResults;
 
   resolve(state);

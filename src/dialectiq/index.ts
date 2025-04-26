@@ -49,13 +49,15 @@ export async function selectOption3<T, S extends Record<string, any>>({
         maxDisplay,
       });
 
-    const cleanup = () =>
-      cleanupTerminal({
+    const cleanup = async () => {
+      // Update cleanup to be async and await cleanupTerminal
+      await cleanupTerminal({
         resolve,
         state,
         context,
         getName,
       });
+    };
 
     // Setup terminal and initial render
     setupTerminal();

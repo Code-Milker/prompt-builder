@@ -211,7 +211,6 @@ export function createFileSelectionFlow(): Flow {
 
     return chosenOption.path;
   }
-
   // Main execution logic
   async function execute(input?: any): Promise<any> {
     console.log('Select a root directory to scan for subdirectories...');
@@ -220,9 +219,6 @@ export function createFileSelectionFlow(): Flow {
     console.log(`Listing directories in ${projectRoot}...`);
     const directories = await listDirectories(projectRoot);
     const selectedDirs = await selectDirectories(directories);
-
-    console.log('Selected directories:');
-    selectedDirs.forEach((dir) => console.log(`- ${dir}`));
 
     const processChoice = await promptUser(
       'Process directories? (f: select individual files, c: copy entire directories)\n' +
