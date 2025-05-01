@@ -172,6 +172,9 @@ export function handleSelectionByType<T>({
     });
   } else if (type === 'unselectAll') {
     unselectAllOptions({ context, updateState, render });
+  } else {
+    context.errorMessage = `Unsupported command: ${type}`;
+    render();
   }
 
   if (

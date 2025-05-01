@@ -1,6 +1,6 @@
 // terminal/index.ts
 import { stdin, stdout } from 'process';
-import type { SelectionContext, TerminalDimensions } from '../types';
+import type { SelectionContext, TerminalDimensions } from '../types/index';
 import {
   switchInputMode,
   appendInput,

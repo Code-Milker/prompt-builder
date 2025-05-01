@@ -15,10 +15,10 @@ export async function selectOption3<T, S extends Record<string, any>>({
   maxDisplay,
   maxSelections = null,
   transformations = [],
+  commands,
   customCommands = [],
 }: SelectOptionParams<T, S>): Promise<SelectOptionReturn<T, S>> {
   return new Promise((resolve) => {
-    // Initialize
     const displayFn =
       display ||
       ((option: T, input: string) =>
@@ -28,10 +28,10 @@ export async function selectOption3<T, S extends Record<string, any>>({
       options,
       state,
       transformations,
+      commands,
       customCommands,
     });
 
-    // Setup functions
     const updateState = () =>
       updateSelectionState({
         state,
@@ -50,7 +50,6 @@ export async function selectOption3<T, S extends Record<string, any>>({
       });
 
     const cleanup = async () => {
-      // Update cleanup to be async and await cleanupTerminal
       await cleanupTerminal({
         resolve,
         state,
@@ -59,12 +58,10 @@ export async function selectOption3<T, S extends Record<string, any>>({
       });
     };
 
-    // Setup terminal and initial render
     setupTerminal();
     updateState();
     render();
 
-    // Handle input
     stdin.on('data', (data) =>
       handleInput({
         data: data.toString(),

@@ -6,28 +6,26 @@ export function initializeContext<T, S extends Record<string, any>>({
   options,
   state,
   transformations = [],
+  commands,
   customCommands = [],
 }: {
   options: T[];
   state: S;
   transformations?: Transformation[];
+  commands?: string[];
   customCommands?: string[];
 }): SelectionContext<T> {
-  const defaultCommands = [
-    'single',
-    'range',
-    'selectAll',
-    'unselectAll',
-    'done',
-  ];
-  const commands = [...defaultCommands, ...customCommands];
+  const defaultCommands = ['single', 'selectAll', 'unselectAll', 'done']; // Exclude 'range'
+  const commandList = commands
+    ? [...new Set([...commands, 'done'])] // Ensure 'done' is included
+    : [...new Set([...defaultCommands, ...customCommands, 'done'])]; // Fallback with customCommands
 
   return {
     currentInput: '',
     selectedOptions: state.selections ? [...state.selections] : ([] as T[]),
     availableOptions: [...options],
     errorMessage: '',
-    selectionTypes: commands as readonly string[],
+    selectionTypes: commandList as readonly string[],
     currentSelectionTypeIndex: 0,
     MAX_DISPLAY_SELECTED: 10,
     activeTransformations: [],
@@ -148,7 +146,7 @@ export function handleSelection<T>({
   cleanup: () => void;
 }): void {
   const type = context.selectionTypes[context.currentSelectionTypeIndex];
-  context.currentInput = input; // Set input explicitly
+  context.currentInput = input;
   if (type === 'done') {
     cleanup();
   } else {
@@ -184,14 +182,14 @@ export function executeCommand<T>({
   if (inputMode === 'input') {
     handleSelection({
       context,
-      input: currentInput, // Pass input explicitly
+      input: currentInput,
       getName,
       maxSelections,
       updateState,
       render,
       cleanup,
     });
-    context.currentInput = ''; // Reset after
+    context.currentInput = '';
   } else if (inputMode === 'command') {
     if (currentInput) {
       const lowerInput = currentInput.toLowerCase();

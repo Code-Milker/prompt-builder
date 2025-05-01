@@ -14,13 +14,14 @@ export interface SelectOptionParams<T, S extends Record<string, any>> {
   state: S;
   maxDisplay?: number;
   maxSelections?: number | null;
-  transformations?: Transformation[]; // New parameter
-  customCommands?: string[]; // Allow customizing commands
+  transformations?: Transformation[];
+  commands?: string[]; // Specify full command list
+  customCommands?: string[]; // For backward compatibility
 }
 
 export type SelectOptionReturn<T, S extends Record<string, any>> = S & {
   selections: T[];
-  transformations: Record<string, any>; // Applied transformations results
+  transformations: Record<string, any>;
 };
 
 export interface SelectionContext<T> {
@@ -31,9 +32,9 @@ export interface SelectionContext<T> {
   selectionTypes: readonly string[];
   currentSelectionTypeIndex: number;
   MAX_DISPLAY_SELECTED: number;
-  activeTransformations: string[]; // Names of active transformations
-  availableTransformations: Transformation[]; // Available transformations
-  inputMode: 'input' | 'command' | 'transformation'; // Added input mode
+  activeTransformations: string[];
+  availableTransformations: Transformation[];
+  inputMode: 'input' | 'command' | 'transformation';
 }
 
 export interface TerminalDimensions {

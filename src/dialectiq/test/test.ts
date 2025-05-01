@@ -64,7 +64,7 @@ async function main() {
     history: ['Previous selections here...'],
     state: { currentDirectory: process.cwd() },
     transformations,
-    customCommands: ['myCustomCommand'],
+    customCommands: ['done'],
   });
 
   console.log('log41388:', JSON.stringify(result, null, 2));
