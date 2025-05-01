@@ -29,12 +29,19 @@ export async function cleanupTerminal<T>({
   context: SelectionContext<T>;
   getName: (option: T) => string;
 }): Promise<void> {
+  // Reset terminal state
   stdout.write('\x1b[?1049l'); // Return to main screen buffer
+  stdout.write('\x1b[0m'); // Reset all attributes (colors, bold, etc.)
+  stdout.write('\x1b[H'); // Move cursor to home (top-left)
+  stdout.write('\x1b[J'); // Clear screen from cursor down
   stdout.write('\x1b[?25h'); // Show cursor
+
+  // Disable raw mode and clean up stdin
   stdin.setRawMode(false);
   stdin.removeAllListeners('data');
-  stdout.write('\n');
+  stdin.destroy(); // Fully close stdin to release terminal
 
+  // Process transformations
   const transformationResults: Record<string, any> = {};
   for (const transformName of context.activeTransformations) {
     const transformation = context.availableTransformations.find(
@@ -46,7 +53,11 @@ export async function cleanupTerminal<T>({
     }
   }
   state.transformations = transformationResults;
+
+  // Resolve the promise and flush stdout
   resolve(state);
+  stdout.write('\n');
+  process.stdout.end(); // Ensure all output is flushed and stdout closes
 }
 
 export function getTerminalDimensions(): TerminalDimensions {
