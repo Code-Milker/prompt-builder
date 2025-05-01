@@ -15,7 +15,7 @@ export function initializeContext<T, S extends Record<string, any>>({
   commands?: string[];
   customCommands?: string[];
 }): SelectionContext<T> {
-  const defaultCommands = ['single', 'selectAll', 'unselectAll', 'done']; // Exclude 'range'
+  const defaultCommands = ['single', 'selectAll', 'unselectAll']; // Exclude 'range'
   const commandList = commands
     ? [...new Set([...commands, 'done'])] // Ensure 'done' is included
     : [...new Set([...defaultCommands, ...customCommands, 'done'])]; // Fallback with customCommands
@@ -60,7 +60,10 @@ export function switchInputMode<T>({
   context: SelectionContext<T>;
   render: () => void;
 }): void {
-  if (context.inputMode === 'input' && context.availableTransformations.length > 0) {
+  if (
+    context.inputMode === 'input' &&
+    context.availableTransformations.length > 0
+  ) {
     context.inputMode = 'transformation';
   } else {
     context.inputMode = 'input';

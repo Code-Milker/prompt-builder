@@ -68,7 +68,7 @@ export function renderAvailableOptions<T>({
 
   // Render the header with command and navigation indicator
   stdout.write(
-    `\x1b[${startLine};${paddingLeft}H\x1b[K${colors.cyan}${colors.bold}Options (${selectedOptions.length}/${availableOptions.length}) | Command: ${currentCommand} [←/→]${colors.reset}`,
+    `\x1b[${startLine};${paddingLeft}H\x1b[K${colors.cyan}${colors.bold}Options (${selectedOptions.length}/${availableOptions.length}) ${currentCommand} [←/→]${colors.reset}`,
   );
 
   // Render each option
