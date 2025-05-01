@@ -1,6 +1,3 @@
-
-
-// ui/components/prompt.ts
 import { stdout } from 'process';
 import type { TerminalDimensions } from '../../types';
 import { colors } from '../../ui/utils';
@@ -8,17 +5,35 @@ import { colors } from '../../ui/utils';
 export function renderInputPrompt({
   error,
   input,
+  inputMode,
   dimensions,
 }: {
   error: string;
   input: string;
+  inputMode: 'input' | 'command' | 'transformation';
   dimensions: TerminalDimensions;
 }): void {
   const { rows, paddingLeft } = dimensions;
 
+  let modeLabel = '';
+  let modeColor = '';
+  switch (inputMode) {
+    case 'command':
+      modeLabel = '(command)';
+      modeColor = colors.yellow;
+      break;
+    case 'transformation':
+      modeLabel = '(transformation)';
+      modeColor = colors.magenta;
+      break;
+    default:
+      modeLabel = '(input)';
+      modeColor = colors.green;
+  }
+
   const prompt = error
     ? `${colors.red}Error: ${error}${colors.reset}`
-    : `${colors.green}> ${input}${colors.reset}`;
+    : `${modeColor}${modeLabel}${colors.reset} > ${input}`;
 
   stdout.write(`\x1b[${rows};${paddingLeft}H\x1b[K${prompt}`);
 
@@ -26,6 +41,9 @@ export function renderInputPrompt({
   if (error) {
     stdout.write('\x1b[?25l'); // Hide cursor
   } else {
-    stdout.write(`\x1b[${rows};${paddingLeft + 2 + input.length}H\x1b[?25h`); // Show cursor at input position
+    const cursorOffset = modeLabel.length + 2; // Account for mode label and "> "
+    stdout.write(
+      `\x1b[${rows};${paddingLeft + cursorOffset + input.length}H\x1b[?25h`,
+    ); // Show cursor at input position
   }
 }

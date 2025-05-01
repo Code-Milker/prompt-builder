@@ -33,6 +33,7 @@ export interface SelectionContext<T> {
   MAX_DISPLAY_SELECTED: number;
   activeTransformations: string[]; // Names of active transformations
   availableTransformations: Transformation[]; // Available transformations
+  inputMode: 'input' | 'command' | 'transformation'; // Added input mode
 }
 
 export interface TerminalDimensions {

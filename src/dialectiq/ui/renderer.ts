@@ -12,7 +12,7 @@ import type {
   TerminalDimensions,
   Transformation,
 } from '../types';
-import { colors } from './utils';
+import { colors } from './utils.ts';
 import { stdout } from 'bun';
 
 export function renderInterface<T>({
@@ -36,7 +36,7 @@ export function renderInterface<T>({
   // Calculate available space
   const historyLines = Math.min(5, history.length);
   let stateLines = calculateStateLines(state);
-  const commandLines = 2;
+  const commandLines = calculateCommandLines(context.selectionTypes);
   const transformationLines = calculateTransformationLines(
     context.availableTransformations,
   );
@@ -83,6 +83,8 @@ export function renderInterface<T>({
   renderCommands({
     selectionTypes: context.selectionTypes,
     index: context.currentSelectionTypeIndex,
+    inputMode: context.inputMode,
+    currentInput: context.currentInput,
     line: currentLine,
     dimensions,
   });
@@ -92,6 +94,8 @@ export function renderInterface<T>({
   currentLine = renderTransformations({
     activeTransformations: context.activeTransformations,
     availableTransformations: context.availableTransformations,
+    inputMode: context.inputMode,
+    currentInput: context.currentInput,
     startLine: currentLine,
     dimensions,
   });
@@ -110,20 +114,19 @@ export function renderInterface<T>({
   renderInputPrompt({
     error: context.errorMessage,
     input: context.currentInput,
+    inputMode: context.inputMode,
     dimensions,
   });
 
-  // Render help text for transformations at the bottom
-  if (context.availableTransformations.length > 0) {
-    renderTransformationHelp(dimensions);
-  }
+  // Render help text for mode switching at the bottom
+  renderModeHelp(dimensions);
 }
 
-function renderTransformationHelp(dimensions: TerminalDimensions): void {
+function renderModeHelp(dimensions: TerminalDimensions): void {
   const { rows, paddingLeft } = dimensions;
   const helpLine = rows - 2;
   stdout.write(
-    `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}Type 't' + number to toggle a transformation${colors.reset}`,
+    `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command`,
   );
 }
 
@@ -135,6 +138,10 @@ function calculateStateLines(state: Record<string, any>): number {
     }
   });
   return lines;
+}
+
+function calculateCommandLines(selectionTypes: readonly string[]): number {
+  return selectionTypes.length + 1; // Header + one line per command
 }
 
 function calculateTransformationLines(
@@ -155,9 +162,10 @@ function prepareDisplayOptions<T>({
   const { selectedOptions, availableOptions, currentInput } = context;
 
   // Filter available options based on input
-  const matchingOptions = currentInput
-    ? findMatches({ input: currentInput, options: availableOptions, getName })
-    : availableOptions;
+  const matchingOptions =
+    currentInput && context.inputMode === 'input'
+      ? findMatches({ input: currentInput, options: availableOptions, getName })
+      : availableOptions;
 
   // Get matching unselected options
   const matchingUnselected = matchingOptions.filter(

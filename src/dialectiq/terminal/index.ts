@@ -1,15 +1,14 @@
 // terminal/index.ts
-
 import { stdin, stdout } from 'process';
 import type { SelectionContext, TerminalDimensions } from '../types';
-
 import {
-  switchSelectionType,
+  switchInputMode,
   appendInput,
   backspaceInput,
   toggleTransformation,
+  executeCommand,
 } from '../core/context';
-import { handleSelectionByType } from '../core/selection';
+import { handleSelection } from '../core/context';
 
 export function setupTerminal(): void {
   stdin.setRawMode(true);
@@ -36,22 +35,17 @@ export async function cleanupTerminal<T>({
   stdin.removeAllListeners('data');
   stdout.write('\n');
 
-  // Apply transformations and await their results
   const transformationResults: Record<string, any> = {};
-
   for (const transformName of context.activeTransformations) {
     const transformation = context.availableTransformations.find(
       (t) => t.name === transformName,
     );
     if (transformation) {
       const result = transformation.apply(context.selectedOptions, getName);
-      transformationResults[transformName] = await result; // Await the promise if it exists
+      transformationResults[transformName] = await result;
     }
   }
-
-  // Include resolved transformation results in state
   state.transformations = transformationResults;
-
   resolve(state);
 }
 
@@ -86,51 +80,54 @@ export function handleInput<T>({
   render: () => void;
   cleanup: () => void;
 }): void {
-  const char = data.toString();
+  // Process input as a Buffer to handle raw mode correctly
+  const inputBuffer = Buffer.from(data, 'utf8');
+  for (const byte of inputBuffer) {
+    const char = String.fromCharCode(byte);
 
-  if (char === '\x03') {
-    // Ctrl+C
-    cleanup();
-  } else if (char === '\t') {
-    // Tab
-    switchSelectionType({ context, render });
-  } else if (char === '\r') {
-    // Enter
-    const type = context.selectionTypes[context.currentSelectionTypeIndex];
-    handleSelectionByType({
-      context,
-      type,
-      getName,
-      maxSelections,
-      updateState,
-      render,
-      cleanup,
-    });
-  } else if (char === '\x7f') {
-    // Backspace
-    backspaceInput({ context, render });
-  } else if (char >= '1' && char <= '9') {
-    // Check if it's a transformation command (prefixed with t)
-    if (context.currentInput === 't') {
-      const idx = parseInt(char, 10) - 1;
-      if (idx >= 0 && idx < context.availableTransformations.length) {
-        toggleTransformation({ context, transformationIndex: idx, render });
+    if (char === '\x03') {
+      // Ctrl+C: Exit without saving
+      cleanup();
+    } else if (char === '\x04') {
+      // Ctrl+D: Trigger "done" command
+      const doneIndex = context.selectionTypes.indexOf('done');
+      if (doneIndex !== -1) {
+        context.currentSelectionTypeIndex = doneIndex;
         context.currentInput = '';
+        executeCommand({
+          context,
+          getName,
+          maxSelections,
+          updateState,
+          render,
+          cleanup,
+        });
       } else {
-        appendInput({ context, char, render });
+        context.errorMessage = 'Done command not available';
+        render();
       }
-    } else {
+    } else if (char === '\t') {
+      // Tab: Switch mode
+      switchInputMode({ context, render });
+    } else if (char === '\r') {
+      // Enter: Execute current command
+      executeCommand({
+        context,
+        getName,
+        maxSelections,
+        updateState,
+        render,
+        cleanup,
+      });
+    } else if (char === '\x7f') {
+      // Backspace
+      backspaceInput({ context, render });
+    } else if (char >= ' ' && char <= '~') {
+      // Printable characters
       appendInput({ context, char, render });
     }
-  } else if (char === 't' && context.currentInput === '') {
-    // Start transformation selection mode
-    appendInput({ context, char, render });
-  } else if (char >= ' ' && char <= '~') {
-    // Printable characters
-    appendInput({ context, char, render });
   }
 
-  // Check selection limit
   if (
     maxSelections !== null &&
     context.selectedOptions.length >= maxSelections

@@ -11,13 +11,14 @@ import path from 'path';
 export const executivePromise = promisify(exec);
 
 // Colors for output
-export const colors: Colors = {
+export const colors = {
+  magenta: '\x1b[35m',
   reset: '\x1b[0m',
   cyan: '\x1b[36m',
   yellow: '\x1b[33m',
   green: '\x1b[32m',
   red: '\x1b[31m',
-  gray: '\x1b[90m', // Added gray for non-selected modes
+  gray: '\x1b[90m',
   bold: '\x1b[1m',
 };
 

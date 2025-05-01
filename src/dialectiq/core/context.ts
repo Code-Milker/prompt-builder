@@ -1,6 +1,6 @@
 // core/context.ts
-
 import type { SelectionContext, Transformation } from '../types';
+import { handleSelectionByType } from './selection';
 
 export function initializeContext<T, S extends Record<string, any>>({
   options,
@@ -32,6 +32,7 @@ export function initializeContext<T, S extends Record<string, any>>({
     MAX_DISPLAY_SELECTED: 10,
     activeTransformations: [],
     availableTransformations: transformations,
+    inputMode: 'input',
   };
 }
 
@@ -54,15 +55,22 @@ export function updateSelectionState<T>({
   state['selections'] = selectedOptions;
 }
 
-export function switchSelectionType<T>({
+export function switchInputMode<T>({
   context,
   render,
 }: {
   context: SelectionContext<T>;
   render: () => void;
 }): void {
-  context.currentSelectionTypeIndex =
-    (context.currentSelectionTypeIndex + 1) % context.selectionTypes.length;
+  if (context.inputMode === 'input') {
+    context.inputMode = 'command';
+  } else if (context.inputMode === 'command') {
+    context.inputMode =
+      context.availableTransformations.length > 0 ? 'transformation' : 'input';
+  } else {
+    context.inputMode = 'input';
+  }
+  context.currentInput = '';
   context.errorMessage = '';
   render();
 }
@@ -93,7 +101,6 @@ export function backspaceInput<T>({
   render();
 }
 
-// New function to handle transformation toggling
 export function toggleTransformation<T>({
   context,
   transformationIndex,
@@ -121,4 +128,146 @@ export function toggleTransformation<T>({
 
   context.errorMessage = '';
   render();
+}
+
+export function handleSelection<T>({
+  context,
+  input,
+  getName,
+  maxSelections,
+  updateState,
+  render,
+  cleanup,
+}: {
+  context: SelectionContext<T>;
+  input: string;
+  getName: (option: T) => string;
+  maxSelections: number | null;
+  updateState: () => void;
+  render: () => void;
+  cleanup: () => void;
+}): void {
+  const type = context.selectionTypes[context.currentSelectionTypeIndex];
+  context.currentInput = input; // Set input explicitly
+  if (type === 'done') {
+    cleanup();
+  } else {
+    handleSelectionByType({
+      context,
+      type,
+      getName,
+      maxSelections,
+      updateState,
+      render,
+      cleanup,
+    });
+  }
+}
+
+export function executeCommand<T>({
+  context,
+  getName,
+  maxSelections,
+  updateState,
+  render,
+  cleanup,
+}: {
+  context: SelectionContext<T>;
+  getName: (option: T) => string;
+  maxSelections: number | null;
+  updateState: () => void;
+  render: () => void;
+  cleanup: () => void;
+}): void {
+  const { currentInput, selectionTypes, inputMode } = context;
+
+  if (inputMode === 'input') {
+    handleSelection({
+      context,
+      input: currentInput, // Pass input explicitly
+      getName,
+      maxSelections,
+      updateState,
+      render,
+      cleanup,
+    });
+    context.currentInput = ''; // Reset after
+  } else if (inputMode === 'command') {
+    if (currentInput) {
+      const lowerInput = currentInput.toLowerCase();
+      let bestMatchIndex = -1;
+      let maxOverlap = -1;
+
+      selectionTypes.forEach((type, idx) => {
+        const displayText =
+          type === 'done' ? 'done' : type === 'single' ? 'select first' : type;
+        const lowerType = displayText.toLowerCase();
+        let overlap = 0;
+        for (
+          let i = 0;
+          i < Math.min(lowerType.length, lowerInput.length);
+          i++
+        ) {
+          if (lowerType[i] === lowerInput[i]) {
+            overlap++;
+          } else {
+            break;
+          }
+        }
+        if (overlap > maxOverlap && lowerType.includes(lowerInput)) {
+          maxOverlap = overlap;
+          bestMatchIndex = idx;
+        }
+      });
+
+      if (bestMatchIndex !== -1) {
+        context.currentSelectionTypeIndex = bestMatchIndex;
+        context.currentInput = '';
+        context.inputMode = 'input';
+        render();
+      } else {
+        context.errorMessage =
+          'No matching command found. Press Tab to switch to input mode.';
+        render();
+      }
+    } else {
+      const type = selectionTypes[context.currentSelectionTypeIndex];
+      context.currentInput = '';
+      context.inputMode = 'input';
+      if (type === 'done') {
+        cleanup();
+      } else {
+        handleSelectionByType({
+          context,
+          type,
+          getName,
+          maxSelections,
+          updateState,
+          render,
+          cleanup,
+        });
+      }
+    }
+  } else if (inputMode === 'transformation') {
+    if (currentInput) {
+      const lowerInput = currentInput.toLowerCase();
+      const matchIndex = context.availableTransformations.findIndex((t) =>
+        t.name.toLowerCase().includes(lowerInput),
+      );
+      if (matchIndex !== -1) {
+        toggleTransformation({
+          context,
+          transformationIndex: matchIndex,
+          render,
+        });
+        context.inputMode = 'input';
+        context.currentInput = '';
+      } else {
+        context.errorMessage = 'No matching transformation found';
+      }
+    } else {
+      context.errorMessage = 'Enter a transformation name to select';
+    }
+    render();
+  }
 }

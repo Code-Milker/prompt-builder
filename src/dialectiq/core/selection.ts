@@ -28,7 +28,8 @@ export function handleSingleSelection<T>({
   });
   if (
     matches.length > 0 &&
-    canAddSelection({ selectedOptions, maxSelections })
+    canAddSelection({ selectedOptions, maxSelections }) &&
+    !selectedOptions.includes(matches[0])
   ) {
     context.selectedOptions.push(matches[0]);
     context.currentInput = '';
@@ -36,7 +37,9 @@ export function handleSingleSelection<T>({
     updateState();
   } else {
     context.errorMessage = matches.length
-      ? 'Selection limit reached.'
+      ? selectedOptions.includes(matches[0])
+        ? 'Option already selected.'
+        : 'Selection limit reached.'
       : 'No options match your search.';
   }
   render();

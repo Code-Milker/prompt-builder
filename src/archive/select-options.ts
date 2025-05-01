@@ -360,7 +360,7 @@ function handleEnter<T>({
   }
 }
 
-function appendInput({
+export function appendInput({
   context,
   char,
   render,
