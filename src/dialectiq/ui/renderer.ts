@@ -2,7 +2,6 @@
 import { getTerminalDimensions, clearScreen } from '../terminal';
 import { renderHistory } from './components/history';
 import { renderState } from './components/state';
-import { renderCommands } from './components/commands';
 import { renderAvailableOptions } from './components/options';
 import { renderInputPrompt } from './components/prompt';
 import { renderTransformations } from './components/transformations';
@@ -36,19 +35,17 @@ export function renderInterface<T>({
   // Calculate available space
   const historyLines = Math.min(5, history.length);
   let stateLines = calculateStateLines(state);
-  const commandLines = calculateCommandLines(context.selectionTypes);
   const transformationLines = calculateTransformationLines(
     context.availableTransformations,
   );
   const optionsHeaderLines = 1;
   const promptLines = 1;
-  const spacingLines = 3; // Added extra space for transformations section
+  const spacingLines = 2; // Reduced spacing since commands section is removed
 
   const usedLines =
     paddingTop +
     historyLines +
     stateLines +
-    commandLines +
     transformationLines +
     optionsHeaderLines +
     promptLines +
@@ -79,17 +76,6 @@ export function renderInterface<T>({
     startLine: paddingTop + historyLines,
     dimensions,
   });
-
-  renderCommands({
-    selectionTypes: context.selectionTypes,
-    index: context.currentSelectionTypeIndex,
-    inputMode: context.inputMode,
-    currentInput: context.currentInput,
-    line: currentLine,
-    dimensions,
-  });
-
-  currentLine += commandLines + 1;
 
   currentLine = renderTransformations({
     activeTransformations: context.activeTransformations,
@@ -125,9 +111,9 @@ export function renderInterface<T>({
 function renderModeHelp(dimensions: TerminalDimensions): void {
   const { rows, paddingLeft } = dimensions;
   const helpLine = rows - 2;
-  // stdout.write(
-  //   `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command`,
-  // );
+  stdout.write(
+    `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command | [←/→] Change command`,
+  );
 }
 
 function calculateStateLines(state: Record<string, any>): number {
@@ -138,10 +124,6 @@ function calculateStateLines(state: Record<string, any>): number {
     }
   });
   return lines;
-}
-
-function calculateCommandLines(selectionTypes: readonly string[]): number {
-  return selectionTypes.length + 1; // Header + one line per command
 }
 
 function calculateTransformationLines(

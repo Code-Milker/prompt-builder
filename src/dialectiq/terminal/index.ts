@@ -93,8 +93,8 @@ export function handleInput<T>({
 }): void {
   // Process input as a Buffer to handle raw mode correctly
   const inputBuffer = Buffer.from(data, 'utf8');
-  for (const byte of inputBuffer) {
-    const char = String.fromCharCode(byte);
+  for (let i = 0; i < inputBuffer.length; i++) {
+    const char = String.fromCharCode(inputBuffer[i]);
 
     if (char === '\x03') {
       // Ctrl+C: Exit without saving
@@ -133,6 +133,22 @@ export function handleInput<T>({
     } else if (char === '\x7f') {
       // Backspace
       backspaceInput({ context, render });
+    } else if (inputBuffer.slice(i, i + 3).toString() === '\x1b[D') {
+      // Left Arrow: Previous selection type
+      context.currentSelectionTypeIndex = Math.max(
+        0,
+        context.currentSelectionTypeIndex - 1,
+      );
+      render();
+      i += 2; // Skip the escape sequence
+    } else if (inputBuffer.slice(i, i + 3).toString() === '\x1b[C') {
+      // Right Arrow: Next selection type
+      context.currentSelectionTypeIndex = Math.min(
+        context.selectionTypes.length - 1,
+        context.currentSelectionTypeIndex + 1,
+      );
+      render();
+      i += 2; // Skip the escape sequence
     } else if (char >= ' ' && char <= '~') {
       // Printable characters
       appendInput({ context, char, render });

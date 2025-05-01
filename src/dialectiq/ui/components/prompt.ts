@@ -10,7 +10,7 @@ export function renderInputPrompt({
 }: {
   error: string;
   input: string;
-  inputMode: 'input' | 'command' | 'transformation';
+  inputMode: 'input' | 'transformation';
   dimensions: TerminalDimensions;
 }): void {
   const { rows, paddingLeft } = dimensions;
@@ -18,16 +18,12 @@ export function renderInputPrompt({
   let modeLabel = '';
   let modeColor = '';
   switch (inputMode) {
-    case 'command':
-      modeLabel = '(command)';
-      modeColor = colors.yellow;
-      break;
     case 'transformation':
-      modeLabel = '(transformation)';
+      modeLabel = '(transformations)';
       modeColor = colors.magenta;
       break;
     default:
-      modeLabel = '(input)';
+      modeLabel = '(Options)';
       modeColor = colors.green;
   }
 

@@ -60,11 +60,8 @@ export function switchInputMode<T>({
   context: SelectionContext<T>;
   render: () => void;
 }): void {
-  if (context.inputMode === 'input') {
-    context.inputMode = 'command';
-  } else if (context.inputMode === 'command') {
-    context.inputMode =
-      context.availableTransformations.length > 0 ? 'transformation' : 'input';
+  if (context.inputMode === 'input' && context.availableTransformations.length > 0) {
+    context.inputMode = 'transformation';
   } else {
     context.inputMode = 'input';
   }
@@ -190,62 +187,6 @@ export function executeCommand<T>({
       cleanup,
     });
     context.currentInput = '';
-  } else if (inputMode === 'command') {
-    if (currentInput) {
-      const lowerInput = currentInput.toLowerCase();
-      let bestMatchIndex = -1;
-      let maxOverlap = -1;
-
-      selectionTypes.forEach((type, idx) => {
-        const displayText =
-          type === 'done' ? 'done' : type === 'single' ? 'select first' : type;
-        const lowerType = displayText.toLowerCase();
-        let overlap = 0;
-        for (
-          let i = 0;
-          i < Math.min(lowerType.length, lowerInput.length);
-          i++
-        ) {
-          if (lowerType[i] === lowerInput[i]) {
-            overlap++;
-          } else {
-            break;
-          }
-        }
-        if (overlap > maxOverlap && lowerType.includes(lowerInput)) {
-          maxOverlap = overlap;
-          bestMatchIndex = idx;
-        }
-      });
-
-      if (bestMatchIndex !== -1) {
-        context.currentSelectionTypeIndex = bestMatchIndex;
-        context.currentInput = '';
-        context.inputMode = 'input';
-        render();
-      } else {
-        context.errorMessage =
-          'No matching command found. Press Tab to switch to input mode.';
-        render();
-      }
-    } else {
-      const type = selectionTypes[context.currentSelectionTypeIndex];
-      context.currentInput = '';
-      context.inputMode = 'input';
-      if (type === 'done') {
-        cleanup();
-      } else {
-        handleSelectionByType({
-          context,
-          type,
-          getName,
-          maxSelections,
-          updateState,
-          render,
-          cleanup,
-        });
-      }
-    }
   } else if (inputMode === 'transformation') {
     if (currentInput) {
       const lowerInput = currentInput.toLowerCase();

@@ -58,9 +58,17 @@ export function renderAvailableOptions<T>({
     highlightColor = colors.red;
   }
 
-  // Render the header
+  // Get display text for current command
+  const currentCommand =
+    currentType === 'done'
+      ? 'done'
+      : currentType === 'single'
+        ? 'select first'
+        : currentType;
+
+  // Render the header with command and navigation indicator
   stdout.write(
-    `\x1b[${startLine};${paddingLeft}H\x1b[K${colors.cyan}${colors.bold}Options (${selectedOptions.length}/${availableOptions.length})${colors.reset}`,
+    `\x1b[${startLine};${paddingLeft}H\x1b[K${colors.cyan}${colors.bold}Options (${selectedOptions.length}/${availableOptions.length}) | Command: ${currentCommand} [←/→]${colors.reset}`,
   );
 
   // Render each option
