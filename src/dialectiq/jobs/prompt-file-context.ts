@@ -55,16 +55,14 @@ export async function selectFilesRecursively(
     fileState = await selectOption3({
       options: files,
       getName: (file) => path.relative(projectsDir, file), // Relative paths for UI
-      history: [
-        'Select files from the directory (use Tab to change selection mode, Enter to confirm).',
-      ],
+      history: [''],
       state: {
         'Selected Directory': projectsDir,
         selections: [],
       },
       maxSelections: 10,
       transformations: transformations,
-      customCommands: ['customCommands'],
+      // customCommands: ['customCommands'],
     });
   } catch (error) {
     console.error('Error in selectOption3:', error.message);

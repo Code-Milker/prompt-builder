@@ -131,7 +131,7 @@ export async function selectDirectory(
     },
     maxSelections: 10,
     transformations: transformations,
-    customCommands: ['customCommands'],
+    // customCommands: ['customCommands'],
   });
 
   // Resolve all transformation promises

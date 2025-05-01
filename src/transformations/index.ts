@@ -6,14 +6,14 @@ import path from 'path';
 export const transformations: Transformation[] = [
   {
     name: 'uppercase',
-    description: 'Convert selected text to uppercase',
+    description: '',
     apply: <T>(selections: T[], getName: (option: T) => string) => {
       return selections.map((s) => getName(s).toUpperCase());
     },
   },
   {
     name: 'fetch-content',
-    description: 'Get file content for selected files',
+    description: '',
     apply: <T>(selections: T[], getName: (option: T) => string) => {
       const contents: Record<string, string> = {};
       for (const selection of selections) {
@@ -38,7 +38,7 @@ export const transformations: Transformation[] = [
   },
   {
     name: 'extract-functions',
-    description: 'Extract function names from TypeScript files',
+    description: '',
     apply: async <T>(selections: T[], getName: (option: T) => string) => {
       const results: Record<string, string[]> = {};
       for (const selection of selections) {
@@ -61,7 +61,7 @@ export const transformations: Transformation[] = [
   },
   {
     name: 'to-markdown',
-    description: 'Convert file contents to Markdown for LLM prompting',
+    description: '',
     apply: <T>(selections: T[], getName: (option: T) => string) => {
       let markdown = `# Files Related to User Prompt\n\nHere are the selected files provided as context for the user prompt:\n\n`;
       for (const selection of selections) {

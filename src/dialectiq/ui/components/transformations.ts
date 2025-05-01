@@ -38,7 +38,7 @@ export function renderTransformations({
   availableTransformations.forEach((transform, idx) => {
     const isActive = activeTransformations.includes(transform.name);
     const marker = isActive ? `${colors.green}[x]${colors.reset}` : '[ ]';
-    const transformKey = `${idx + 1}`;
+    // const transformKey = `${idx + 1}`;
 
     let formattedName = transform.name;
 
@@ -56,7 +56,7 @@ export function renderTransformations({
     }
 
     stdout.write(
-      `\x1b[${currentLine};${indent}H\x1b[K${marker} ${transformKey}: ${formattedName} - ${transform.description}`,
+      `\x1b[${currentLine};${indent}H\x1b[K${marker} ${formattedName} ${transform.description}`,
     );
     currentLine++;
   });

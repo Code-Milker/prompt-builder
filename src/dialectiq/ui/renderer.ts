@@ -125,9 +125,9 @@ export function renderInterface<T>({
 function renderModeHelp(dimensions: TerminalDimensions): void {
   const { rows, paddingLeft } = dimensions;
   const helpLine = rows - 2;
-  stdout.write(
-    `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command`,
-  );
+  // stdout.write(
+  //   `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command`,
+  // );
 }
 
 function calculateStateLines(state: Record<string, any>): number {
