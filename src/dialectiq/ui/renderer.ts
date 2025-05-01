@@ -5,13 +5,15 @@ import { renderState } from './components/state';
 import { renderAvailableOptions } from './components/options';
 import { renderInputPrompt } from './components/prompt';
 import { renderTransformations } from './components/transformations';
+import { renderPipes } from './components/pipes';
 import { findMatches, groupOptionsByDirectory } from '../core/matching';
 import type {
   SelectionContext,
   TerminalDimensions,
   Transformation,
+  Pipe,
 } from '../types';
-import { colors } from './utils.ts';
+import { colors } from './utils';
 import { stdout } from 'bun';
 
 export function renderInterface<T>({
@@ -38,15 +40,17 @@ export function renderInterface<T>({
   const transformationLines = calculateTransformationLines(
     context.availableTransformations,
   );
+  const pipeLines = calculatePipeLines(context.availablePipes);
   const optionsHeaderLines = 1;
   const promptLines = 1;
-  const spacingLines = 2; // Reduced spacing since commands section is removed
+  const spacingLines = 3; // Spacing for transformations and pipes sections
 
   const usedLines =
     paddingTop +
     historyLines +
     stateLines +
     transformationLines +
+    pipeLines +
     optionsHeaderLines +
     promptLines +
     spacingLines;
@@ -88,6 +92,17 @@ export function renderInterface<T>({
 
   currentLine += 1; // Add spacing
 
+  currentLine = renderPipes({
+    activePipes: context.activePipes,
+    availablePipes: context.availablePipes,
+    inputMode: context.inputMode,
+    currentInput: context.currentInput,
+    startLine: currentLine,
+    dimensions,
+  });
+
+  currentLine += 1; // Add spacing
+
   renderAvailableOptions({
     context,
     displayOptions,
@@ -111,9 +126,9 @@ export function renderInterface<T>({
 function renderModeHelp(dimensions: TerminalDimensions): void {
   const { rows, paddingLeft } = dimensions;
   const helpLine = rows - 2;
-  stdout.write(
-    `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command | [←/→] Change command`,
-  );
+  // stdout.write(
+  //   `\x1b[${helpLine};${paddingLeft}H\x1b[K${colors.dim}[Tab] Switch mode | [Enter] Apply command | [←/→] Change command`,
+  // );
 }
 
 function calculateStateLines(state: Record<string, any>): number {
@@ -130,6 +145,10 @@ function calculateTransformationLines(
   transformations: Transformation[],
 ): number {
   return transformations.length === 0 ? 2 : transformations.length + 1;
+}
+
+function calculatePipeLines(pipes: Pipe[]): number {
+  return pipes.length === 0 ? 2 : pipes.length + 1;
 }
 
 function prepareDisplayOptions<T>({

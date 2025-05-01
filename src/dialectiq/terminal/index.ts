@@ -6,6 +6,7 @@ import {
   appendInput,
   backspaceInput,
   toggleTransformation,
+  togglePipe,
   executeCommand,
 } from '../core/context';
 import { handleSelection } from '../core/context';
@@ -53,6 +54,17 @@ export async function cleanupTerminal<T>({
     }
   }
   state.transformations = transformationResults;
+
+  // Process pipes
+  const pipeResults: Record<string, any> = {};
+  for (const pipeName of context.activePipes) {
+    const pipe = context.availablePipes.find((p) => p.name === pipeName);
+    if (pipe) {
+      const result = pipe.apply(context, state, getName);
+      pipeResults[pipeName] = await result;
+    }
+  }
+  state.pipes = pipeResults;
 
   // Resolve the promise and flush stdout
   resolve(state);

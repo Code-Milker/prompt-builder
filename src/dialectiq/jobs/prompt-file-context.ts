@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import type { SelectOptionReturn } from '../types';
+import type { SelectionContext, SelectOptionReturn } from '../types';
 import { selectOption3 } from '../index';
 import { transformations } from '../../transformations';
+import { sendToOllama } from '../../llm/ollama';
+import { sendToGroq } from '../../llm/groq';
 
 // Recursively fetch files from a directory and its subdirectories, then select files
 export async function selectFilesRecursively(
@@ -46,10 +48,83 @@ export async function selectFilesRecursively(
       selections: [],
       Selected: 'None',
       transformations: {},
+      pipes: {},
     };
   }
 
-  // Select files from the directory with transformations
+  // Define pipes
+  const pipes = [
+    {
+      name: 'Ask Ollama',
+      description: 'Send context to Ollama LLM',
+      apply: async <T>(
+        context: SelectionContext<T>,
+        state: Record<string, any>,
+        getName: (option: T) => string,
+      ) => {
+        const contextString = JSON.stringify(
+          {
+            selectedDirectory: state['Selected Directory'],
+            selections: context.selectedOptions.map(getName),
+            transformations: state.transformations,
+          },
+          null,
+          2,
+        );
+        try {
+          return await sendToOllama(
+            [
+              {
+                role: 'system',
+                content:
+                  'You are a helpful AI assistant. Analyze the provided context and provide a response.',
+              },
+              { role: 'user', content: contextString },
+            ],
+            { model: 'wizardlm2:7b' },
+          );
+        } catch (error) {
+          return `Error: ${error.message}`;
+        }
+      },
+    },
+    {
+      name: 'Ask Groq',
+      description: 'Send context to Groq LLM',
+      apply: async <T>(
+        context: SelectionContext<T>,
+        state: Record<string, any>,
+        getName: (option: T) => string,
+      ) => {
+        const contextString = JSON.stringify(
+          {
+            selectedDirectory: state['Selected Directory'],
+            selections: context.selectedOptions.map(getName),
+            transformations: state.transformations,
+          },
+          null,
+          2,
+        );
+        try {
+          return await sendToGroq(
+            [
+              {
+                role: 'system',
+                content:
+                  'You are a helpful AI assistant. Analyze the provided context and provide a response.',
+              },
+              { role: 'user', content: contextString },
+            ],
+            { taskType: 'general' },
+          );
+        } catch (error) {
+          return `Error: ${error.message}`;
+        }
+      },
+    },
+  ];
+
+  // Select files from the directory with transformations and pipes
   let fileState;
   try {
     fileState = await selectOption3({
@@ -58,11 +133,13 @@ export async function selectFilesRecursively(
       history: [''],
       state: {
         'Selected Directory': projectsDir,
-        selections: [],
+        selections: [], // Pre-selected files
+        activeTransformations: ['to-markdown'], // Pre-activated transformation
+        // activePipes: ['Ask Ollama'],
       },
       maxSelections: 10,
       transformations: transformations,
-      // customCommands: ['customCommands'],
+      pipes: pipes,
     });
   } catch (error) {
     console.error('Error in selectOption3:', error.message);
@@ -81,12 +158,24 @@ export async function selectFilesRecursively(
     }
   }
 
+  // Resolve all pipe promises with error handling
+  const resolvedPipes: Record<string, any> = {};
+  for (const [name, result] of Object.entries(fileState.pipes)) {
+    try {
+      resolvedPipes[name] = await result;
+    } catch (error) {
+      console.error(`Error in pipe "${name}":`, error.message);
+      resolvedPipes[name] = `Error: ${error.message}`;
+    }
+  }
+
   const resolvedFileState: SelectOptionReturn<string, Record<string, any>> = {
     ...fileState,
     transformations: resolvedTransformations,
+    pipes: resolvedPipes,
   };
 
-  return resolvedFileState; // Return full fileState with resolved transformations
+  return resolvedFileState; // Return full fileState with resolved transformations and pipes
 }
 
 // Get project directory from command-line argument or fall back to ~/Projects
@@ -94,7 +183,7 @@ const projectsDir =
   process.argv[2] ||
   path.join(process.env.HOME || process.env.USERPROFILE, 'Projects');
 
-// Ensure logs directory exists
+// Ensure logs Jurassic exists
 const logsDir = path.join(
   process.env.HOME || process.env.USERPROFILE,
   'Projects/prompt-builder/logs',
@@ -120,6 +209,8 @@ selectFilesRecursively(projectsDir)
     // File paths
     const jsonLogFile = path.join(runLogDir, `select-option.json`);
     const markdownLogFile = path.join(runLogDir, `prompt-context.md`);
+    const ollamaLogFile = path.join(runLogDir, `ollama-response.txt`);
+    const groqLogFile = path.join(runLogDir, `groq-response.txt`);
 
     // Write full response as JSON
     fs.writeFileSync(jsonLogFile, JSON.stringify(response, null, 2), 'utf-8');
@@ -143,6 +234,38 @@ selectFilesRecursively(projectsDir)
       }
     } else {
       console.log('No to-markdown output available');
+    }
+
+    // Write Ollama output if available
+    if (response.pipes['Ask Ollama']) {
+      if (typeof response.pipes['Ask Ollama'] === 'string') {
+        fs.writeFileSync(ollamaLogFile, response.pipes['Ask Ollama'], 'utf-8');
+        console.log(`Wrote Ollama output to ${ollamaLogFile}`);
+        console.log(response.pipes['Ask Ollama']);
+      } else {
+        console.error(
+          'Ollama output is not a string:',
+          response.pipes['Ask Ollama'],
+        );
+      }
+    } else {
+      console.log('No Ollama output available');
+    }
+
+    // Write Groq output if available
+    if (response.pipes['Ask Groq']) {
+      if (typeof response.pipes['Ask Groq'] === 'string') {
+        fs.writeFileSync(groqLogFile, response.pipes['Ask Groq'], 'utf-8');
+        console.log(`Wrote Groq output to ${groqLogFile}`);
+        console.log(response.pipes['Ask Groq']);
+      } else {
+        console.error(
+          'Groq output is not a string:',
+          response.pipes['Ask Groq'],
+        );
+      }
+    } else {
+      console.log('No Groq output available');
     }
   })
   .catch((error) => {

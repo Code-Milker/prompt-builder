@@ -10,7 +10,7 @@ export function renderInputPrompt({
 }: {
   error: string;
   input: string;
-  inputMode: 'input' | 'transformation';
+  inputMode: 'input' | 'transformation' | 'pipe';
   dimensions: TerminalDimensions;
 }): void {
   const { rows, paddingLeft } = dimensions;
@@ -22,8 +22,12 @@ export function renderInputPrompt({
       modeLabel = '(transformations)';
       modeColor = colors.magenta;
       break;
+    case 'pipe':
+      modeLabel = '(pipes)';
+      modeColor = colors.blue;
+      break;
     default:
-      modeLabel = '(Options)';
+      modeLabel = '(options)';
       modeColor = colors.green;
   }
 

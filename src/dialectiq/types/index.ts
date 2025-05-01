@@ -6,6 +6,16 @@ export interface Transformation {
   apply: <T>(selections: T[], getName: (option: T) => string) => any;
 }
 
+export interface Pipe {
+  name: string;
+  description: string;
+  apply: <T>(
+    context: SelectionContext<T>,
+    state: Record<string, any>,
+    getName: (option: T) => string,
+  ) => Promise<any>;
+}
+
 export interface SelectOptionParams<T, S extends Record<string, any>> {
   options: T[];
   getName: (option: T) => string;
@@ -15,13 +25,15 @@ export interface SelectOptionParams<T, S extends Record<string, any>> {
   maxDisplay?: number;
   maxSelections?: number | null;
   transformations?: Transformation[];
-  commands?: string[]; // Specify full command list
-  customCommands?: string[]; // For backward compatibility
+  pipes?: Pipe[];
+  commands?: string[];
+  customCommands?: string[];
 }
 
 export type SelectOptionReturn<T, S extends Record<string, any>> = S & {
   selections: T[];
   transformations: Record<string, any>;
+  pipes: Record<string, any>;
 };
 
 export interface SelectionContext<T> {
@@ -34,7 +46,9 @@ export interface SelectionContext<T> {
   MAX_DISPLAY_SELECTED: number;
   activeTransformations: string[];
   availableTransformations: Transformation[];
-  inputMode: 'input' | 'transformation';
+  activePipes: string[];
+  availablePipes: Pipe[];
+  inputMode: 'input' | 'transformation' | 'pipe';
 }
 
 export interface TerminalDimensions {

@@ -80,7 +80,7 @@ export async function sendToOllama(
   } = {},
 ): Promise<string> {
   // Use provided model or default to wizardlm2:8x22b
-  const selectedModel = options.model || 'wizardlm2:8x22b';
+  const selectedModel = options.model || 'wizardlm2:7b';
 
   // Estimate token count for logging
 

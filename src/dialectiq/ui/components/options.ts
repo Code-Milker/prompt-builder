@@ -25,6 +25,7 @@ export function renderAvailableOptions<T>({
     currentInput,
     selectionTypes,
     currentSelectionTypeIndex,
+    inputMode,
   } = context;
 
   let highlightedOptions: Set<T> = new Set();
@@ -66,9 +67,12 @@ export function renderAvailableOptions<T>({
         ? 'select first'
         : currentType;
 
+  // Color header based on input mode
+  const headerColor = inputMode === 'input' ? colors.yellow : colors.cyan;
+
   // Render the header with command and navigation indicator
   stdout.write(
-    `\x1b[${startLine};${paddingLeft}H\x1b[K${colors.cyan}${colors.bold}Options (${selectedOptions.length}/${availableOptions.length}) ${currentCommand} [←/→]${colors.reset}`,
+    `\x1b[${startLine};${paddingLeft}H\x1b[K${headerColor}${colors.bold}Options (${selectedOptions.length}/${availableOptions.length}) ${currentCommand} [←/→]${colors.reset}`,
   );
 
   // Render each option

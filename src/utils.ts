@@ -214,14 +214,12 @@ export async function selectOption<T>(
       selectionTypes.forEach((type, index) => {
         const displayText =
           type === 'single'
-            ? 'select first match'
-            : type === 'allHighlighted'
-              ? 'select all matches'
-              : type === 'range'
-                ? 'select range'
-                : type === 'selectAll'
-                  ? 'select all'
-                  : 'unselect all';
+            ? 'first match'
+            : type === 'range'
+              ? 'select range'
+              : type === 'selectAll'
+                ? 'select all'
+                : 'unselect all';
         const color = index === currentSelectionTypeIndex ? '' : colors.gray; // No color for selected, gray for non-selected
         const bold = index === currentSelectionTypeIndex ? colors.bold : '';
         enterConfirmText += `${color}${bold}${displayText}${index === currentSelectionTypeIndex ? colors.reset : colors.reset}${index < selectionTypes.length - 1 ? ' | ' : ''}`;
