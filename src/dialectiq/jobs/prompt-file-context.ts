@@ -408,7 +408,6 @@ try {
 console.log('Starting script execution...');
 selectFilesRecursively(projectsDir, preSelectedFiles)
   .then(async (response) => {
-    console.log('selectFilesRecursively completed');
     // Generate timestamp for subdirectory
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const runLogDir = path.join(logsDir, timestamp);
@@ -437,7 +436,7 @@ selectFilesRecursively(projectsDir, preSelectedFiles)
         JSON.stringify(response, null, 2),
         'utf-8',
       );
-      console.log(`Wrote full output to ${jsonLogFile}`);
+      // console.log(`Wrote full output to ${jsonLogFile}`);
     } catch (error) {
       console.error(
         `Error writing JSON log to ${jsonLogFile}:`,
@@ -454,7 +453,7 @@ selectFilesRecursively(projectsDir, preSelectedFiles)
             response.transformations['to-markdown'],
             'utf-8',
           );
-          console.log(`Wrote to-markdown output to ${markdownLogFile}`);
+          // console.log(`Wrote to-markdown output to ${markdownLogFile}`);
           console.log(response.transformations['to-markdown']);
         } catch (error) {
           console.error(
@@ -496,7 +495,7 @@ selectFilesRecursively(projectsDir, preSelectedFiles)
         );
       }
     } else {
-      console.log('No Ollama output available');
+      // console.log('No Ollama output available');
     }
 
     // Write Groq output if available
@@ -519,7 +518,7 @@ selectFilesRecursively(projectsDir, preSelectedFiles)
         );
       }
     } else {
-      console.log('No Groq output available');
+      // console.log('No Groq output available');
     }
   })
   .catch((error) => {

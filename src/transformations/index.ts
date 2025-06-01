@@ -1,5 +1,4 @@
 import type { Transformation } from '../dialectiq/types';
-
 import fs from 'fs';
 import path from 'path';
 
@@ -44,7 +43,7 @@ export const transformations: Transformation[] = [
       for (const selection of selections) {
         const relativePath = getName(selection);
         if (path.extname(relativePath) === '.ts') {
-          const absolutePath = selection as string; // Fixed: Use selection as absolute path
+          const absolutePath = selection as string;
           try {
             const content = await fs.promises.readFile(absolutePath, 'utf-8');
             const functionMatches = content.match(/function\s+(\w+)/g) || [];
@@ -61,10 +60,14 @@ export const transformations: Transformation[] = [
   },
   {
     name: 'to-markdown',
-    description: '',
+    description:
+      'Convert selected files to markdown with centered file names, file numbering, and clear delimiters',
     apply: <T>(selections: T[], getName: (option: T) => string) => {
-      let markdown = `# Files Related to User Prompt\n\nHere are the selected files provided as context for the user prompt:\n\n`;
-      for (const selection of selections) {
+      let markdown = '';
+      const maxWidth = 80; // Maximum width for centered file name line
+      const totalFiles = selections.length;
+
+      selections.forEach((selection, index) => {
         const fullPath = selection as string;
         const relativePath = getName(selection);
         let fileContent = 'No content available';
@@ -77,14 +80,22 @@ export const transformations: Transformation[] = [
         } catch (err) {
           fileContent = `Error: ${(err as Error).message}`;
         }
-        const ext = path.extname(relativePath).slice(1).toLowerCase() || '';
-        markdown += `## \`${relativePath}\`\n\n`;
-        markdown += '```' + ext + '\n';
-        markdown += fileContent;
-        markdown += '\n```\n\n';
-      }
-      markdown += '---\n*Use these files to respond to the user prompt.*\n';
-      return markdown;
+
+        // File number (e.g., File 1/13)
+        const fileNumber = `File ${index + 1}/${totalFiles}`;
+
+        // Center the file name
+        const fileName = `${fileNumber} Path ${relativePath}`;
+        const paddingLength = Math.max(0, (maxWidth - fileName.length - 6) / 2); // 6 for '###' on both sides
+        const leftPadding = ' '.repeat(Math.floor(paddingLength));
+        const rightPadding = ' '.repeat(Math.ceil(paddingLength));
+        const centeredFileName = `###${leftPadding}${fileName}${rightPadding}###`;
+
+        // Add section to markdown
+        markdown += `\n${centeredFileName}\n${fileContent}`;
+      });
+
+      return markdown.trim();
     },
   },
 ];

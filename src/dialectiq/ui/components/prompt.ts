@@ -19,15 +19,15 @@ export function renderInputPrompt({
   let modeColor = '';
   switch (inputMode) {
     case 'transformation':
-      modeLabel = '(transformations)';
+      modeLabel = '(Transformations)';
       modeColor = colors.magenta;
       break;
     case 'pipe':
-      modeLabel = '(pipes)';
+      modeLabel = '(Pipes)';
       modeColor = colors.blue;
       break;
     default:
-      modeLabel = '(options)';
+      modeLabel = '(Options)';
       modeColor = colors.green;
   }
 
