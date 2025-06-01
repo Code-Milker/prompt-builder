@@ -37,7 +37,6 @@ export function renderPipes({
   availablePipes.forEach((pipe, idx) => {
     const isActive = activePipes.includes(pipe.name);
     const marker = isActive ? `${colors.green}[x]${colors.reset}` : '[ ]';
-
     let formattedName = pipe.name;
 
     // Highlight active pipe in green

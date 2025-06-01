@@ -3,7 +3,8 @@
   "module": "prompt-builder.ts",
   "type": "module",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/diff": "^7.0.2"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
@@ -18,6 +19,7 @@
     "proseWrap": "always"
   },
   "dependencies": {
+    "diff": "^7.0.0",
     "tesseract.js": "^6.0.1"
   }
 }
