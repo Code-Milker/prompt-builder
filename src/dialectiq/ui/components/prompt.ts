@@ -1,16 +1,16 @@
 import { stdout } from 'process';
-import type { TerminalDimensions } from '../../types';
+import type { TerminalDimensions, SelectionContext } from '../../types'; // Added SelectionContext
 import { colors } from '../../ui/utils';
 
 export function renderInputPrompt({
   error,
   input,
-  inputMode,
+  inputMode, // Type will be inferred from SelectionContext['inputMode']
   dimensions,
 }: {
   error: string;
   input: string;
-  inputMode: 'input' | 'transformation' | 'pipe';
+  inputMode: SelectionContext<any>['inputMode']; // Updated type
   dimensions: TerminalDimensions;
 }): void {
   const { rows, paddingLeft } = dimensions;
@@ -26,7 +26,11 @@ export function renderInputPrompt({
       modeLabel = '(Pipes)';
       modeColor = colors.blue;
       break;
-    default:
+    case 'paste': // Added paste mode
+      modeLabel = '(Paste Text)';
+      modeColor = colors.yellow; // Or another color of your choice
+      break;
+    default: // 'input' mode
       modeLabel = '(Options)';
       modeColor = colors.green;
   }

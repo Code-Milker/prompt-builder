@@ -48,7 +48,7 @@ export interface SelectionContext<T> {
   availableTransformations: Transformation[];
   activePipes: string[];
   availablePipes: Pipe[];
-  inputMode: 'input' | 'transformation' | 'pipe';
+  inputMode: 'input' | 'transformation' | 'pipe' | 'paste'; // Added 'paste'
 }
 
 export interface TerminalDimensions {

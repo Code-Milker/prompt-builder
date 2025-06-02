@@ -1,5 +1,8 @@
 import type { SelectionContext, Transformation, Pipe } from '../types';
 import { handleSelectionByType } from './selection';
+import { canAddSelection, findMatches } from './matching'; // Added findMatches and canAddSelection
+import * as fs from 'fs';
+import * as path from 'path';
 
 export function initializeContext<T, S extends Record<string, any>>({
   options,
@@ -21,19 +24,21 @@ export function initializeContext<T, S extends Record<string, any>>({
     ? [...new Set([...commands, 'done'])]
     : [...new Set([...defaultCommands, ...customCommands, 'done'])];
 
-  // Initialize selections from state, filtering for valid options
   const initialSelectedOptions = state.selections
-    ? state.selections.filter((opt: T) => options.includes(opt))
+    ? state.selections.filter((opt: T) =>
+        options.some(
+          (availableOpt) =>
+            JSON.stringify(availableOpt) === JSON.stringify(opt),
+        ),
+      ) // Basic check for inclusion, might need better `getName` based comparison
     : ([] as T[]);
 
-  // Initialize active transformations from state, filtering for valid names
   const initialActiveTransformations = state.activeTransformations
     ? state.activeTransformations.filter((name: string) =>
         transformations.some((t) => t.name === name),
       )
     : [];
 
-  // Initialize active pipes from state, filtering for valid names
   const initialActivePipes = state.activePipes
     ? state.activePipes.filter((name: string) =>
         pipes.some((p) => p.name === name),
@@ -82,21 +87,30 @@ export function switchInputMode<T>({
   context: SelectionContext<T>;
   render: () => void;
 }): void {
-  if (context.inputMode === 'input') {
+  const currentMode = context.inputMode;
+  let nextMode: SelectionContext<T>['inputMode'] = 'input';
+
+  if (currentMode === 'input') {
     if (context.availableTransformations.length > 0) {
-      context.inputMode = 'transformation';
+      nextMode = 'transformation';
     } else if (context.availablePipes.length > 0) {
-      context.inputMode = 'pipe';
-    }
-  } else if (context.inputMode === 'transformation') {
-    if (context.availablePipes.length > 0) {
-      context.inputMode = 'pipe';
+      nextMode = 'pipe';
     } else {
-      context.inputMode = 'input';
+      nextMode = 'paste';
     }
-  } else {
-    context.inputMode = 'input';
+  } else if (currentMode === 'transformation') {
+    if (context.availablePipes.length > 0) {
+      nextMode = 'pipe';
+    } else {
+      nextMode = 'paste';
+    }
+  } else if (currentMode === 'pipe') {
+    nextMode = 'paste';
+  } else if (currentMode === 'paste') {
+    nextMode = 'input';
   }
+
+  context.inputMode = nextMode;
   context.currentInput = '';
   context.errorMessage = '';
   render();
@@ -251,44 +265,99 @@ export function executeCommand<T>({
   } else if (inputMode === 'transformation') {
     if (currentInput) {
       const lowerInput = currentInput.toLowerCase();
-      const matchIndex = context.availableTransformations.findIndex((t) =>
+      const transformation = context.availableTransformations.find((t) =>
         t.name.toLowerCase().includes(lowerInput),
       );
-      if (matchIndex !== -1) {
-        toggleTransformation({
-          context,
-          transformationIndex: matchIndex,
-          render,
-        });
-        context.inputMode = 'input';
-        context.currentInput = '';
+      if (transformation) {
+        const index = context.availableTransformations.indexOf(transformation);
+        toggleTransformation({ context, transformationIndex: index, render });
       } else {
-        context.errorMessage = 'No matching transformation found';
+        context.errorMessage = 'No matching transformation found.';
       }
-    } else {
-      context.errorMessage = 'Enter a transformation name to select';
     }
+    context.currentInput = '';
     render();
   } else if (inputMode === 'pipe') {
     if (currentInput) {
       const lowerInput = currentInput.toLowerCase();
-      const matchIndex = context.availablePipes.findIndex((p) =>
+      const pipe = context.availablePipes.find((p) =>
         p.name.toLowerCase().includes(lowerInput),
       );
-      if (matchIndex !== -1) {
-        togglePipe({
-          context,
-          pipeIndex: matchIndex,
-          render,
-        });
-        context.inputMode = 'input';
-        context.currentInput = '';
+      if (pipe) {
+        const index = context.availablePipes.indexOf(pipe);
+        togglePipe({ context, pipeIndex: index, render });
       } else {
-        context.errorMessage = 'No matching pipe found';
+        context.errorMessage = 'No matching pipe found.';
+      }
+    }
+    context.currentInput = '';
+    render();
+  } else if (inputMode === 'paste') {
+    if (context.currentInput.trim() !== '') {
+      try {
+        const pasteDir = './dialectiq_pastes';
+        if (!fs.existsSync(pasteDir)) {
+          fs.mkdirSync(pasteDir, { recursive: true });
+        }
+        const filePath = path.join(
+          pasteDir,
+          `pasted_content_${Date.now()}.txt`,
+        );
+        fs.writeFileSync(filePath, context.currentInput);
+
+        // This assumes T can be a string (filepath).
+        // If T is a complex object, you'll need to construct an instance of T here
+        // which includes the filePath or content. For example:
+        // const newFileOption = { path: filePath, name: path.basename(filePath) } as unknown as T;
+        // For simplicity, assuming T is string (filePath):
+        const newFileOption = filePath as unknown as T;
+
+        // Add to available options if not already present (using getName for comparison)
+        // This check might be simplified if T is always string and getName is identity
+        const newFileOptionName = getName(newFileOption);
+        if (
+          !context.availableOptions.find(
+            (opt) => getName(opt) === newFileOptionName,
+          )
+        ) {
+          context.availableOptions.push(newFileOption);
+        }
+
+        if (
+          canAddSelection({
+            selectedOptions: context.selectedOptions,
+            maxSelections,
+          })
+        ) {
+          if (
+            !context.selectedOptions.find(
+              (opt) => getName(opt) === newFileOptionName,
+            )
+          ) {
+            context.selectedOptions.push(newFileOption);
+          }
+          context.currentInput = '';
+          context.errorMessage = '';
+          context.inputMode = 'input'; // Switch back to input mode
+        } else {
+          context.errorMessage =
+            'Pasted file created but not selected: limit reached or already selected.';
+        }
+      } catch (e: any) {
+        const err = e as Error;
+        context.errorMessage = `Error creating file: ${err.message}`;
       }
     } else {
-      context.errorMessage = 'Enter a pipe name to select';
+      context.errorMessage = 'No content to paste.';
     }
+    // Clear input if it was only whitespace and resulted in "No content to paste"
+    if (
+      context.currentInput.trim() === '' &&
+      context.errorMessage === 'No content to paste.'
+    ) {
+      context.currentInput = '';
+    }
+    updateState();
     render();
   }
 }
